@@ -168,7 +168,7 @@ the user presses `S`. `serde` + `serde_json` handle serialisation automatically 
 ## Issues
 
 Work through these in order. Each is self-contained.
-
+<!--
 ### #1 — Terminal setup and teardown
 Set up and restore the terminal correctly using `crossterm`. Enable raw mode, switch to
 the alternate screen on startup, and restore both on exit — including on panic (use a
@@ -186,7 +186,7 @@ Implement `Tab` to cycle focus between panels, `i` to enter Insert mode, `Esc` t
 return to Normal. Highlight the focused panel's border. Show the current mode in the
 status bar.  
 _Touches: `app.rs`, `event.rs`, `ui.rs`_
-
+-->
 ### #4 — URL and method editing
 Make the URL field editable in Insert mode (basic left/right/backspace/delete cursor).
 Toggle method between GET and POST with `m` in Normal mode.  
