@@ -19,9 +19,6 @@ type Term = Terminal<CrosstermBackend<Stdout>>;
 #[tokio::main]
 async fn main() -> Result<()> {
     // --- Panic hook ---
-    // If the app panics we must restore the terminal *before* Rust prints the
-    // panic message. Without this the terminal is left in raw mode with the
-    // alternate screen still active, making it very hard to read the error.
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
         let _ = disable_raw_mode();
@@ -29,10 +26,6 @@ async fn main() -> Result<()> {
         original_hook(panic_info);
     }));
 
-    // --- Raw mode ---
-    // In raw mode the terminal stops processing keystrokes before your program
-    // sees them. That means Ctrl-C no longer sends SIGINT, Enter no longer
-    // adds a newline, etc. — we handle every key ourselves.
     enable_raw_mode()?;
 
     // --- Alternate screen ---
@@ -43,8 +36,7 @@ async fn main() -> Result<()> {
 
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
 
-    // Run the app. We capture the result so we can always restore the terminal,
-    // even if `run` returns an error.
+    println!("Starting run loop");
     let result = run(&mut terminal, App::new());
 
     // --- Teardown (always runs) ---
@@ -62,8 +54,6 @@ fn run(terminal: &mut Term, mut app: App) -> Result<()> {
         // changed (diffing). This is why ratatui can be fast even at high rates.
         terminal.draw(|frame| ui::render(frame, &app))?;
 
-        // Block here until the next keyboard event arrives.
-        // In issue #5 we'll also poll the HTTP response channel here.
         let event = event::next()?;
         app.update(event);
 

@@ -34,6 +34,33 @@ pub fn render(frame: &mut Frame, app: &App) {
     render_request_builder(frame, app, builder_area);
     render_response(frame, app, response_area);
     render_status_bar(frame, app, status_bar);
+    render_error(frame, app);
+}
+
+fn render_error(frame: &mut Frame, app: &App) {
+    if app.error_message.is_none() {
+        return;
+    }
+
+    let message = app.error_message.as_ref().unwrap();
+
+    if message.is_empty() {
+        return;
+    }
+
+    let area = Frame::area(&frame);
+    let block = Block::default()
+        .title("Error")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Red));
+
+    frame.render_widget(
+        Paragraph::new(message.as_str())
+            .style(Style::default().fg(Color::Red))
+            .block(block),
+        area,
+    );
 }
 
 // ---------------------------------------------------------------------------

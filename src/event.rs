@@ -1,6 +1,7 @@
 use crate::request::Response;
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyEvent};
+use std::fmt;
 use std::time::Duration;
 
 pub enum AppEvent {
@@ -9,6 +10,15 @@ pub enum AppEvent {
     /// An HTTP response arriving from a background task.
     /// This variant is wired up in issue #5 when we add the mpsc channel.
     HttpResponse(Response),
+}
+
+impl fmt::Display for AppEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AppEvent::Key(key) => write!(f, "Key({:?})", key),
+            AppEvent::HttpResponse(_) => write!(f, "HttpResponse(...)"),
+        }
+    }
 }
 
 /// Block until a keyboard event arrives, then return it.
@@ -27,8 +37,6 @@ pub fn next() -> Result<AppEvent> {
             if let Event::Key(key) = event::read()? {
                 return Ok(AppEvent::Key(key));
             }
-            // Non-key events (terminal resize, mouse, focus change) are
-            // silently dropped — we don't need them yet.
         }
     }
 }

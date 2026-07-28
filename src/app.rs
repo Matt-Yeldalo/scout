@@ -1,4 +1,5 @@
 use crate::event::AppEvent;
+use crate::http::send;
 use crate::request::{Collection, Request, Response};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -39,6 +40,7 @@ pub struct App {
     pub active_request: Request,
     pub response: Option<Response>,
     pub is_loading: bool,
+    pub error_message: Option<String>,
 }
 
 impl App {
@@ -54,11 +56,13 @@ impl App {
             active_request: Request::default(),
             response: None,
             is_loading: false,
+            error_message: None,
         }
     }
 
     /// Route an incoming event to the right handler based on current state.
     pub fn update(&mut self, event: AppEvent) {
+        self.error_message = Some(event.to_string());
         match event {
             AppEvent::Key(key) => self.handle_key(key),
             // HTTP response arrives from the background task in issue #5.
@@ -94,12 +98,30 @@ impl App {
                 self.input_mode = InputMode::Insert;
             }
 
+            KeyCode::Char('s') => self.handle_send_request(),
+
             // h / l switch request builder tabs, but only when that panel is focused.
             KeyCode::Char('h') if self.focus == Focus::RequestBuilder => self.prev_tab(),
             KeyCode::Char('l') if self.focus == Focus::RequestBuilder => self.next_tab(),
 
             _ => {}
         }
+    }
+
+    fn handle_send_request(&mut self) {
+        self.is_loading = true;
+        let request = self.active_request.clone();
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            let response = send(request).await.unwrap_or_else(|e| Response {
+                status: 0,
+                status_text: "Error".to_string(),
+                duration_ms: 0,
+                headers: std::collections::HashMap::new(),
+                body: format!("Error: {}", e),
+            });
+            tx.send(AppEvent::HttpResponse(response)).await.unwrap();
+        });
     }
 
     fn handle_insert_key(&mut self, key: KeyEvent) {
