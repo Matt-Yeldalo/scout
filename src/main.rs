@@ -4,6 +4,7 @@ mod http;
 mod request;
 mod ui;
 
+use crate::event::AppEvent;
 use anyhow::Result;
 use app::App;
 use crossterm::{
@@ -35,9 +36,8 @@ async fn main() -> Result<()> {
     execute!(stdout, EnterAlternateScreen)?;
 
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
-
-    println!("Starting run loop");
-    let result = run(&mut terminal, App::new());
+    let (sender, mut receiver) = tokio::sync::mpsc::channel::<AppEvent>(100);
+    let result = run(&mut terminal, App::new(sender), &mut receiver).await;
 
     // --- Teardown (always runs) ---
     disable_raw_mode()?;
@@ -47,14 +47,16 @@ async fn main() -> Result<()> {
     result
 }
 
-fn run(terminal: &mut Term, mut app: App) -> Result<()> {
+async fn run(
+    terminal: &mut Term,
+    mut app: App,
+    receiver: &mut tokio::sync::mpsc::Receiver<AppEvent>,
+) -> Result<()> {
+    let mut event_stream = crossterm::event::EventStream::new();
     loop {
-        // `draw` calls our render function with a fresh `Frame`, then compares
-        // the result against the previous frame and only redraws the cells that
-        // changed (diffing). This is why ratatui can be fast even at high rates.
         terminal.draw(|frame| ui::render(frame, &app))?;
 
-        let event = event::next()?;
+        let event = event::next(receiver, &mut event_stream).await?;
         app.update(event);
 
         if app.should_quit {

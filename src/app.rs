@@ -29,6 +29,7 @@ pub enum RequestTab {
     Auth,
 }
 
+#[derive(Clone)]
 pub struct App {
     pub should_quit: bool,
     pub input_mode: InputMode,
@@ -41,10 +42,11 @@ pub struct App {
     pub response: Option<Response>,
     pub is_loading: bool,
     pub error_message: Option<String>,
+    pub sender: tokio::sync::mpsc::Sender<AppEvent>,
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new(sender: tokio::sync::mpsc::Sender<AppEvent>) -> Self {
         Self {
             should_quit: false,
             input_mode: InputMode::Normal,
@@ -57,15 +59,13 @@ impl App {
             response: None,
             is_loading: false,
             error_message: None,
+            sender,
         }
     }
 
-    /// Route an incoming event to the right handler based on current state.
     pub fn update(&mut self, event: AppEvent) {
-        self.error_message = Some(event.to_string());
         match event {
             AppEvent::Key(key) => self.handle_key(key),
-            // HTTP response arrives from the background task in issue #5.
             AppEvent::HttpResponse(response) => {
                 self.response = Some(response);
                 self.is_loading = false;
@@ -74,8 +74,6 @@ impl App {
     }
 
     fn handle_key(&mut self, key: KeyEvent) {
-        // Dispatch to the right handler depending on which mode we're in.
-        // This is the core of the vim-style modal input model.
         match self.input_mode {
             InputMode::Normal => self.handle_normal_key(key),
             InputMode::Insert => self.handle_insert_key(key),
@@ -111,7 +109,7 @@ impl App {
     fn handle_send_request(&mut self) {
         self.is_loading = true;
         let request = self.active_request.clone();
-        let tx = self.tx.clone();
+        let sender = self.sender.clone();
         tokio::spawn(async move {
             let response = send(request).await.unwrap_or_else(|e| Response {
                 status: 0,
@@ -120,7 +118,7 @@ impl App {
                 headers: std::collections::HashMap::new(),
                 body: format!("Error: {}", e),
             });
-            tx.send(AppEvent::HttpResponse(response)).await.unwrap();
+            sender.send(AppEvent::HttpResponse(response)).await.unwrap();
         });
     }
 
