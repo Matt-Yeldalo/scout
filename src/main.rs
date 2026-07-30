@@ -11,7 +11,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{Terminal, backend::CrosstermBackend};
+use ratatui::{backend::CrosstermBackend, widgets::TableState, Terminal};
 use std::io::{self, Stdout};
 
 // A type alias so we don't repeat `CrosstermBackend<Stdout>` in every signature.
@@ -37,7 +37,12 @@ async fn main() -> Result<()> {
 
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     let (sender, mut receiver) = tokio::sync::mpsc::channel::<AppEvent>(100);
-    let result = run(&mut terminal, App::new(sender), &mut receiver).await;
+    let mut table_state = TableState::default();
+    table_state.select_first();
+    table_state.select_first_column();
+
+    let app = App::new(sender.clone(), table_state);
+    let result = run(&mut terminal, app, &mut receiver).await;
 
     // --- Teardown (always runs) ---
     disable_raw_mode()?;

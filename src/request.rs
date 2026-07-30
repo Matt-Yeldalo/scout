@@ -28,7 +28,7 @@ pub struct Request {
     pub name: String,
     pub method: HttpMethod,
     pub url: String,
-    pub headers: HashMap<String, String>,
+    pub headers: Vec<(String, String)>,
     pub body: Option<String>,
     pub auth: Auth,
 }

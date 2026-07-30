@@ -2,6 +2,7 @@ use crate::event::AppEvent;
 use crate::http::send;
 use crate::request::{Collection, HttpMethod, Request, Response};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::widgets::TableState;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum InputMode {
@@ -29,8 +30,16 @@ pub enum RequestTab {
     Auth,
 }
 
+#[derive(Debug, Default, Clone, PartialEq)]
+pub enum HeaderField {
+    #[default]
+    Key,
+    Value,
+}
+
 #[derive(Clone)]
 pub struct App {
+    pub debug: bool,
     pub should_quit: bool,
     pub input_mode: InputMode,
     pub focus: Focus,
@@ -43,14 +52,23 @@ pub struct App {
     pub is_loading: bool,
     pub error_message: Option<String>,
     pub sender: tokio::sync::mpsc::Sender<AppEvent>,
+    pub selected_header_row: usize,
+    pub editing_header_field: Option<HeaderField>,
+    pub headers_table_state: TableState,
 }
 
 impl App {
-    pub fn new(sender: tokio::sync::mpsc::Sender<AppEvent>) -> Self {
+    pub fn new(
+        sender: tokio::sync::mpsc::Sender<AppEvent>,
+        headers_table_state: TableState,
+    ) -> Self {
         Self {
+            sender,
+            headers_table_state,
+            debug: true,
             should_quit: false,
             input_mode: InputMode::Normal,
-            focus: Focus::Collections,
+            focus: Focus::RequestBuilder,
             active_tab: RequestTab::Url,
             collections: Vec::new(),
             selected_collection: None,
@@ -59,7 +77,8 @@ impl App {
             response: None,
             is_loading: false,
             error_message: None,
-            sender,
+            selected_header_row: 0,
+            editing_header_field: None,
         }
     }
 
@@ -98,9 +117,19 @@ impl App {
 
             KeyCode::Char('s') => self.handle_send_request(),
 
-            // h / l switch request builder tabs, but only when that panel is focused.
-            KeyCode::Char('h') if self.focus == Focus::RequestBuilder => self.prev_tab(),
-            KeyCode::Char('l') if self.focus == Focus::RequestBuilder => self.next_tab(),
+            KeyCode::Char('h') => match self.focus {
+                Focus::RequestBuilder => match self.active_tab {
+                    RequestTab::Url => {}
+                    RequestTab::Headers => self.prev_tab(),
+                    RequestTab::Body => self.prev_tab(),
+                    RequestTab::Auth => self.prev_tab(),
+                },
+                _ => {}
+            },
+            KeyCode::Char('l') => match self.focus {
+                Focus::RequestBuilder => self.next_tab(),
+                _ => {}
+            },
 
             KeyCode::Char('m') => match self.focus {
                 Focus::RequestBuilder => {
@@ -112,6 +141,74 @@ impl App {
                 _ => {}
             },
 
+            KeyCode::Char('a') => match self.focus {
+                Focus::RequestBuilder => match self.active_tab {
+                    RequestTab::Headers => {
+                        self.active_request
+                            .headers
+                            .push(("".to_string(), "".to_string()));
+                        self.selected_header_row = self.active_request.headers.len() - 1;
+                        self.editing_header_field = Some(HeaderField::Key);
+                        self.input_mode = InputMode::Insert;
+                        self.headers_table_state.select(Some(self.selected_header_row));
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
+
+            KeyCode::Right => match self.focus {
+                Focus::RequestBuilder => match self.active_tab {
+                    RequestTab::Headers => match self.editing_header_field {
+                        Some(HeaderField::Key) => {
+                            self.editing_header_field = Some(HeaderField::Value);
+                            // self.headers_table_state.select_next_column();
+                            self.headers_table_state.select_column(Some(1));
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                },
+                _ => {}
+            },
+            KeyCode::Left => match self.focus {
+                Focus::RequestBuilder => match self.active_tab {
+                    RequestTab::Headers => match self.editing_header_field {
+                        Some(HeaderField::Value) => {
+                            self.editing_header_field = Some(HeaderField::Key);
+                            self.headers_table_state.select_column(Some(0));
+                            // self.headers_table_state.select_previous_column();
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                },
+                _ => {}
+            },
+            KeyCode::Up => match self.focus {
+                Focus::RequestBuilder => match self.active_tab {
+                    RequestTab::Headers => {
+                        if self.selected_header_row > 0 {
+                            self.selected_header_row -= 1;
+                            self.headers_table_state.select_previous();
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
+            KeyCode::Down => match self.focus {
+                Focus::RequestBuilder => match self.active_tab {
+                    RequestTab::Headers => {
+                        if self.selected_header_row < self.active_request.headers.len() - 1 {
+                            self.selected_header_row += 1;
+                            self.headers_table_state.select_next();
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
             _ => {}
         }
     }
@@ -136,7 +233,6 @@ impl App {
         match key.code {
             // Esc always exits Insert mode, returning to Normal.
             KeyCode::Esc => self.input_mode = InputMode::Normal,
-
             _ => match self.focus {
                 Focus::Collections => {}
                 Focus::RequestBuilder => match self.active_tab {
@@ -155,7 +251,69 @@ impl App {
                             _ => {}
                         }
                     }
-                    RequestTab::Headers => {}
+                    RequestTab::Headers => {
+                        if let Some(field) = &self.editing_header_field {
+                            let headers = &mut self.active_request.headers;
+                            if let Some((header_key, value)) =
+                                headers.get_mut(self.selected_header_row)
+                            {
+                                match field {
+                                    HeaderField::Key => match key.code {
+                                        KeyCode::Char(c) => header_key.push(c),
+                                        KeyCode::Backspace => {
+                                            header_key.pop();
+                                        }
+                                        KeyCode::Delete => {
+                                            headers.remove(self.selected_header_row);
+                                            if self.selected_header_row > 0 {
+                                                self.selected_header_row -= 1;
+                                            }
+                                            self.headers_table_state
+                                                .select(Some(self.selected_header_row));
+                                        }
+                                        KeyCode::Up => {
+                                            if self.selected_header_row > 0 {
+                                                self.selected_header_row -= 1;
+                                                self.headers_table_state
+                                                    .select(Some(self.selected_header_row));
+                                            }
+                                        }
+                                        KeyCode::Down => {
+                                            if self.selected_header_row < headers.len() - 1 {
+                                                self.selected_header_row += 1;
+                                                self.headers_table_state
+                                                    .select(Some(self.selected_header_row));
+                                            }
+                                        }
+                                        KeyCode::Left => {
+                                            self.editing_header_field = Some(HeaderField::Key);
+                                            self.headers_table_state.select_column(Some(0));
+                                        }
+                                        KeyCode::Right => {
+                                            self.editing_header_field = Some(HeaderField::Value);
+                                            self.headers_table_state.select_column(Some(1));
+                                        }
+                                        KeyCode::Enter => {
+                                            self.editing_header_field = Some(HeaderField::Value);
+                                            self.headers_table_state.select_next_column();
+                                        }
+                                        _ => {}
+                                    },
+                                    HeaderField::Value => match key.code {
+                                        KeyCode::Char(c) => value.push(c),
+                                        KeyCode::Backspace => {
+                                            value.pop();
+                                        }
+                                        KeyCode::Enter => {
+                                            self.editing_header_field = None;
+                                            self.input_mode = InputMode::Normal;
+                                        }
+                                        _ => {}
+                                    },
+                                }
+                            }
+                        }
+                    }
                     RequestTab::Body => {}
                     RequestTab::Auth => {}
                 },

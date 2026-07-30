@@ -103,6 +103,36 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
             .block(focused_block("Collections", focused)),
         area,
     );
+
+    if app.debug {
+        let debug_text = format!(
+            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\nurl: {:?}\nheaders: {:?}\nresponse: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}",
+            app.focus,
+            app.active_tab,
+            app.input_mode,
+            app.active_request.method,
+            app.active_request.url,
+            app.active_request.headers,
+            app.response,
+            app.selected_header_row,
+            app.editing_header_field.as_ref(),
+            app.headers_table_state.selected()
+        );
+
+        let debug_area = Rect {
+            x: area.x,
+            y: area.y + area.height - 20,
+            width: area.width,
+            height: 20,
+        };
+
+        frame.render_widget(
+            Paragraph::new(debug_text)
+                .style(Style::default().fg(Color::LightYellow))
+                .block(Block::default().title("Debug").borders(Borders::ALL)),
+            debug_area,
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +183,7 @@ fn render_request_builder(frame: &mut Frame, app: &App, area: Rect) {
     // Render whichever tab is active. The other tabs are implemented later.
     match app.active_tab {
         RequestTab::Url => render_url_tab(frame, app, content_area),
-        RequestTab::Headers => render_placeholder(frame, "Headers — issue #6", content_area),
+        RequestTab::Headers => render_headers_tab(frame, app, content_area),
         RequestTab::Body => render_placeholder(frame, "Body — issue #7", content_area),
         RequestTab::Auth => render_placeholder(frame, "Auth — issue #8", content_area),
     }
@@ -190,6 +220,41 @@ fn render_url_tab(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     frame.render_widget(Paragraph::new(url_display).style(url_style), url_area);
+}
+
+fn render_headers_tab(frame: &mut Frame, app: &App, area: Rect) {
+    let headers: Vec<(String, String)> = app.active_request.headers.iter().cloned().collect();
+    let widths = [Constraint::Length(20), Constraint::Min(0)];
+    let mut headers_state = app.headers_table_state.clone();
+
+    if headers.is_empty() {
+        render_placeholder(frame, "(no headers)", area);
+        return;
+    }
+
+    frame.render_stateful_widget(
+        ratatui::widgets::Table::new(
+            headers.iter().map(|(k, v)| {
+                // let key = Span::styled(k, Style::default().fg(Color::Cyan));
+                // let value = Span::styled(v, Style::default().fg(Color::White));
+                // ratatui::widgets::Row::new(vec![key, value])
+                ratatui::widgets::Row::new(vec![k.as_str(), v])
+            }),
+            widths,
+        )
+        .header(ratatui::widgets::Row::new(vec![
+            Span::styled("Key", Style::default().bold()),
+            Span::styled("Value", Style::default().bold()),
+        ]))
+        .block(Block::default())
+        .widths(&[Constraint::Length(20), Constraint::Min(0)])
+        .row_highlight_style(Style::new().on_black().bold())
+        .column_highlight_style(Color::Gray)
+        .cell_highlight_style(Style::new().reversed().yellow())
+        .highlight_symbol("> "),
+        area,
+        &mut headers_state,
+    );
 }
 
 fn render_placeholder(frame: &mut Frame, label: &str, area: Rect) {

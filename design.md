@@ -195,13 +195,13 @@ Wire up `http::send` using reqwest inside a `tokio::spawn` task. Send results ba
 `tokio::sync::mpsc`. Display status code, duration, and raw body in the response pane.
 Handle errors (timeout, connection refused) gracefully.
 _Touches: `http.rs`, `app.rs`, `event.rs`, `main.rs`_
--->
 
 ### #4 — URL and method editing
 
 Make the URL field editable in Insert mode (basic left/right/backspace/delete cursor).
-Toggle method between GET and POST with `m` in Normal mode.  
+Toggle method between GET and POST with `m` in Normal mode.
 _Touches: `app.rs`, `ui.rs`, `event.rs`_
+-->
 
 ### #6 — Headers tab
 
