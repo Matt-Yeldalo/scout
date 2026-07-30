@@ -1,6 +1,6 @@
 use crate::request::Response;
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyEvent};
+use crossterm::event::{Event, KeyEvent};
 use std::fmt;
 
 pub enum AppEvent {

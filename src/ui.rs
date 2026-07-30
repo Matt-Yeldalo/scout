@@ -275,7 +275,7 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     // Show context-sensitive hints so the user always knows what keys do something.
     let hints = match app.input_mode {
         InputMode::Normal => {
-            "  [tab] cycle focus   [h/l] switch tab   [i] insert   [s] send   [q] quit"
+            "  [tab] cycle focus   [h/l] switch tab   [i] insert   [m] method   [s] send   [q] quit"
         }
         InputMode::Insert => "  [esc] back to normal",
     };

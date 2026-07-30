@@ -1,6 +1,6 @@
 use crate::event::AppEvent;
 use crate::http::send;
-use crate::request::{Collection, Request, Response};
+use crate::request::{Collection, HttpMethod, Request, Response};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -101,6 +101,16 @@ impl App {
             // h / l switch request builder tabs, but only when that panel is focused.
             KeyCode::Char('h') if self.focus == Focus::RequestBuilder => self.prev_tab(),
             KeyCode::Char('l') if self.focus == Focus::RequestBuilder => self.next_tab(),
+
+            KeyCode::Char('m') => match self.focus {
+                Focus::RequestBuilder => {
+                    self.active_request.method = match self.active_request.method {
+                        HttpMethod::Get => HttpMethod::Post,
+                        HttpMethod::Post => HttpMethod::Get,
+                    };
+                }
+                _ => {}
+            },
 
             _ => {}
         }
