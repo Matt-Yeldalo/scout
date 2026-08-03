@@ -113,6 +113,22 @@ impl App {
             // Enter Insert mode so the user can type into fields.
             KeyCode::Char('i') | KeyCode::Enter => {
                 self.input_mode = InputMode::Insert;
+                match self.focus {
+                    Focus::RequestBuilder => match self.active_tab {
+                        RequestTab::Url => {}
+                        RequestTab::Headers => {
+                            // self.editing_header_field = Some(HeaderField::Key);
+                            match self.headers_table_state.selected_column() {
+                                Some(0) => self.editing_header_field = Some(HeaderField::Key),
+                                Some(1) => self.editing_header_field = Some(HeaderField::Value),
+                                _ => self.editing_header_field = Some(HeaderField::Key),
+                            }
+                        }
+                        RequestTab::Body => {}
+                        RequestTab::Auth => {}
+                    },
+                    _ => {}
+                }
             }
 
             KeyCode::Char('s') => self.handle_send_request(),
@@ -150,7 +166,8 @@ impl App {
                         self.selected_header_row = self.active_request.headers.len() - 1;
                         self.editing_header_field = Some(HeaderField::Key);
                         self.input_mode = InputMode::Insert;
-                        self.headers_table_state.select(Some(self.selected_header_row));
+                        self.headers_table_state
+                            .select(Some(self.selected_header_row));
                     }
                     _ => {}
                 },
@@ -163,6 +180,9 @@ impl App {
                         Some(HeaderField::Key) => {
                             self.editing_header_field = Some(HeaderField::Value);
                             // self.headers_table_state.select_next_column();
+                            self.headers_table_state.select_column(Some(1));
+                        },
+                        None => {
                             self.headers_table_state.select_column(Some(1));
                         }
                         _ => {}
@@ -178,6 +198,9 @@ impl App {
                             self.editing_header_field = Some(HeaderField::Key);
                             self.headers_table_state.select_column(Some(0));
                             // self.headers_table_state.select_previous_column();
+                        },
+                        None => {
+                            self.headers_table_state.select_column(Some(0));
                         }
                         _ => {}
                     },
@@ -251,75 +274,97 @@ impl App {
                             _ => {}
                         }
                     }
-                    RequestTab::Headers => {
-                        if let Some(field) = &self.editing_header_field {
-                            let headers = &mut self.active_request.headers;
-                            if let Some((header_key, value)) =
-                                headers.get_mut(self.selected_header_row)
-                            {
-                                match field {
-                                    HeaderField::Key => match key.code {
-                                        KeyCode::Char(c) => header_key.push(c),
-                                        KeyCode::Backspace => {
-                                            header_key.pop();
-                                        }
-                                        KeyCode::Delete => {
-                                            headers.remove(self.selected_header_row);
-                                            if self.selected_header_row > 0 {
-                                                self.selected_header_row -= 1;
-                                            }
-                                            self.headers_table_state
-                                                .select(Some(self.selected_header_row));
-                                        }
-                                        KeyCode::Up => {
-                                            if self.selected_header_row > 0 {
-                                                self.selected_header_row -= 1;
-                                                self.headers_table_state
-                                                    .select(Some(self.selected_header_row));
-                                            }
-                                        }
-                                        KeyCode::Down => {
-                                            if self.selected_header_row < headers.len() - 1 {
-                                                self.selected_header_row += 1;
-                                                self.headers_table_state
-                                                    .select(Some(self.selected_header_row));
-                                            }
-                                        }
-                                        KeyCode::Left => {
-                                            self.editing_header_field = Some(HeaderField::Key);
-                                            self.headers_table_state.select_column(Some(0));
-                                        }
-                                        KeyCode::Right => {
-                                            self.editing_header_field = Some(HeaderField::Value);
-                                            self.headers_table_state.select_column(Some(1));
-                                        }
-                                        KeyCode::Enter => {
-                                            self.editing_header_field = Some(HeaderField::Value);
-                                            self.headers_table_state.select_next_column();
-                                        }
-                                        _ => {}
-                                    },
-                                    HeaderField::Value => match key.code {
-                                        KeyCode::Char(c) => value.push(c),
-                                        KeyCode::Backspace => {
-                                            value.pop();
-                                        }
-                                        KeyCode::Enter => {
-                                            self.editing_header_field = None;
-                                            self.input_mode = InputMode::Normal;
-                                        }
-                                        _ => {}
-                                    },
-                                }
-                            }
-                        }
-                    }
+                    RequestTab::Headers => self.handle_insert_header(key),
                     RequestTab::Body => {}
                     RequestTab::Auth => {}
                 },
                 Focus::Response => {}
                 _ => {}
             },
+        }
+    }
+
+    fn handle_insert_header(&mut self, key: KeyEvent) {
+        if let Some(field) = &self.editing_header_field {
+            let headers = &mut self.active_request.headers;
+            if let Some((header_key, value)) = headers.get_mut(self.selected_header_row) {
+                match field {
+                    HeaderField::Key => match key.code {
+                        KeyCode::Backspace => {
+                            header_key.pop();
+                        }
+                        KeyCode::Delete => {
+                            headers.remove(self.selected_header_row);
+                            if self.selected_header_row > 0 {
+                                self.selected_header_row -= 1;
+                            }
+                            self.headers_table_state
+                                .select(Some(self.selected_header_row));
+                        }
+                        // KeyCode::Up => {
+                        //     if self.selected_header_row > 0 {
+                        //         self.selected_header_row -= 1;
+                        //         self.headers_table_state
+                        //             .select(Some(self.selected_header_row));
+                        //     }
+                        // }
+                        // KeyCode::Down => {
+                        //     if self.selected_header_row < headers.len() - 1 {
+                        //         self.selected_header_row += 1;
+                        //         self.headers_table_state
+                        //             .select(Some(self.selected_header_row));
+                        //     }
+                        // }
+                        KeyCode::Left => {
+                            self.editing_header_field = Some(HeaderField::Key);
+                            self.headers_table_state.select_column(Some(0));
+                        }
+                        KeyCode::Right => {
+                            self.editing_header_field = Some(HeaderField::Value);
+                            self.headers_table_state.select_column(Some(1));
+                        }
+                        KeyCode::Enter => {
+                            self.editing_header_field = Some(HeaderField::Value);
+                            self.headers_table_state.select_next_column();
+                        }
+                        KeyCode::Char(c) => header_key.push(c),
+                        _ => {}
+                    },
+                    HeaderField::Value => match key.code {
+                        KeyCode::Backspace => {
+                            value.pop();
+                        }
+                        KeyCode::Enter => {
+                            self.editing_header_field = None;
+                            self.input_mode = InputMode::Normal;
+                        }
+                        // KeyCode::Up => {
+                        //     if self.selected_header_row > 0 {
+                        //         self.selected_header_row -= 1;
+                        //         self.headers_table_state
+                        //             .select(Some(self.selected_header_row));
+                        //     }
+                        // }
+                        // KeyCode::Down => {
+                        //     if self.selected_header_row < headers.len() - 1 {
+                        //         self.selected_header_row += 1;
+                        //         self.headers_table_state
+                        //             .select(Some(self.selected_header_row));
+                        //     }
+                        // }
+                        KeyCode::Left => {
+                            self.editing_header_field = Some(HeaderField::Key);
+                            self.headers_table_state.select_column(Some(0));
+                        }
+                        KeyCode::Right => {
+                            self.editing_header_field = Some(HeaderField::Value);
+                            self.headers_table_state.select_column(Some(1));
+                        }
+                        KeyCode::Char(c) => value.push(c),
+                        _ => {}
+                    },
+                }
+            }
         }
     }
 

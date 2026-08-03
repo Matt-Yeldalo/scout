@@ -27,7 +27,8 @@ pub async fn next(
             if let Some(Ok(Event::Key(key))) = maybe_event {
                 return Ok(AppEvent::Key(key));
             } else{
-                return Err(anyhow::anyhow!("Failed to read event"));
+                // return Err(anyhow::anyhow!("Failed to read event"));
+                return Ok(AppEvent::Key(KeyEvent::from(crossterm::event::KeyCode::Null)));
             }
         }
         maybe_response = receiver.recv() => {
