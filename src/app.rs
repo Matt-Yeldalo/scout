@@ -2,6 +2,7 @@ use crate::event::AppEvent;
 use crate::http::send;
 use crate::request::{Collection, HttpMethod, Request, Response};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::widgets::ScrollbarState;
 use ratatui::widgets::TableState;
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -55,6 +56,7 @@ pub struct App {
     pub selected_header_row: usize,
     pub editing_header_field: Option<HeaderField>,
     pub headers_table_state: TableState,
+    pub response_scrollbar: ScrollbarState,
 }
 
 impl App {
@@ -79,6 +81,7 @@ impl App {
             error_message: None,
             selected_header_row: 0,
             editing_header_field: None,
+            response_scrollbar: ScrollbarState::default(),
         }
     }
 
@@ -181,7 +184,7 @@ impl App {
                             self.editing_header_field = Some(HeaderField::Value);
                             // self.headers_table_state.select_next_column();
                             self.headers_table_state.select_column(Some(1));
-                        },
+                        }
                         None => {
                             self.headers_table_state.select_column(Some(1));
                         }
@@ -198,7 +201,7 @@ impl App {
                             self.editing_header_field = Some(HeaderField::Key);
                             self.headers_table_state.select_column(Some(0));
                             // self.headers_table_state.select_previous_column();
-                        },
+                        }
                         None => {
                             self.headers_table_state.select_column(Some(0));
                         }

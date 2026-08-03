@@ -1,11 +1,13 @@
 use crate::app::{App, Focus, InputMode, RequestTab};
 use crate::request::HttpMethod;
+use ratatui::layout::Margin;
+use ratatui::widgets::{Scrollbar, ScrollbarOrientation};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph, Tabs},
+    widgets::{Block, BorderType, Borders, Paragraph, ScrollbarState, Tabs},
 };
 
 /// Entry point called by the main loop on every frame.
@@ -30,9 +32,15 @@ pub fn render(frame: &mut Frame, app: &App) {
         Layout::vertical([Constraint::Percentage(40), Constraint::Percentage(60)])
             .areas(right_area);
 
+    let mut response_scrollbar = app.response_scrollbar.clone();
+
     render_collections(frame, app, sidebar_area);
+
     render_request_builder(frame, app, builder_area);
+
     render_response(frame, app, response_area);
+    render_vertical_scrollbar(frame, response_area, &mut response_scrollbar);
+
     render_status_bar(frame, app, status_bar);
     render_error(frame, app);
 }
@@ -66,6 +74,18 @@ fn render_error(frame: &mut Frame, app: &App) {
 // ---------------------------------------------------------------------------
 // Helper
 // ---------------------------------------------------------------------------
+
+fn render_vertical_scrollbar(frame: &mut Frame, area: Rect, vertical: &mut ScrollbarState) {
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
+    frame.render_stateful_widget(
+        scrollbar,
+        area.inner(Margin {
+            vertical: 1,
+            horizontal: 0,
+        }),
+        vertical,
+    );
+}
 
 /// A bordered panel whose border turns yellow when it has focus.
 /// The visual highlight tells you at a glance which panel will receive input.
@@ -271,6 +291,9 @@ fn render_placeholder(frame: &mut Frame, label: &str, area: Rect) {
 fn render_response(frame: &mut Frame, app: &App, area: Rect) {
     let focused = app.focus == Focus::Response;
     let block = focused_block("Response", focused);
+    // let scrollbar = ratatui::widgets::Scrollbar::default()
+    //                     .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
+    //                     .style(Style::default().fg(Color::DarkGray));
 
     // Three possible states: loading, no response yet, or a response arrived.
     if app.is_loading {
@@ -300,10 +323,7 @@ fn render_response(frame: &mut Frame, app: &App, area: Rect) {
         _ => Color::Red,
     };
 
-    let text = format!(
-        "{} {}   {}ms\n\n{}",
-        resp.status, resp.status_text, resp.duration_ms, resp.body
-    );
+    let text = build_response_text(app, resp);
 
     frame.render_widget(
         Paragraph::new(text)
@@ -311,6 +331,50 @@ fn render_response(frame: &mut Frame, app: &App, area: Rect) {
             .block(block),
         area,
     );
+}
+
+fn build_response_text(app: &App, resp: &crate::request::Response) -> String {
+    let body = if resp.body.is_empty() {
+        "(empty)".to_string()
+    } else {
+        resp.body.clone()
+    };
+
+    if resp
+        .headers
+        .get("content-type")
+        .map(|v| v.contains("application/json"))
+        == Some(true)
+    {
+        // Pretty-print JSON if possible.
+        if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&body) {
+            return format!(
+                "{} {}   {}ms\n\n{}",
+                resp.status,
+                resp.status_text,
+                resp.duration_ms,
+                serde_json::to_string_pretty(&json_value).unwrap_or_else(|_| body)
+            );
+        }
+    }
+
+    if app.debug {
+        let headers_text = resp
+            .headers
+            .iter()
+            .map(|(k, v)| format!("{}: {}", k, v))
+            .collect::<Vec<_>>()
+            .join("\n");
+        return format!(
+            "{} {}   {}ms\n\n{}\n\nHeaders:\n{}",
+            resp.status, resp.status_text, resp.duration_ms, body, headers_text
+        );
+    }
+
+    format!(
+        "{} {}   {}ms\n\n{}",
+        resp.status, resp.status_text, resp.duration_ms, body
+    )
 }
 
 // ---------------------------------------------------------------------------
