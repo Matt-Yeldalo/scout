@@ -110,23 +110,38 @@ fn focused_block(title: &str, focused: bool) -> Block<'_> {
 fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
     let focused = app.focus == Focus::Collections;
 
-    let text = if app.collections.is_empty() {
-        "(empty)\n\nPress [n] to create\na new request."
-    } else {
-        // The full list is rendered in issue #9.
-        "(collections)"
-    };
+    if app.collections.is_empty() {
+        frame.render_widget(
+            Paragraph::new("(empty)\n\nPress [n] to create\na new request.")
+                .style(Style::default().fg(Color::DarkGray))
+                .block(focused_block("Collections", focused)),
+            area,
+        );
+        return;
+    }
 
-    frame.render_widget(
-        Paragraph::new(text)
-            .style(Style::default().fg(Color::Gray))
-            .block(focused_block("Collections", focused)),
+    let items: Vec<Span> = app
+        .collections
+        .iter()
+        .map(|name| Span::raw(format!(" {}", name)))
+        .collect();
+
+    frame.render_stateful_widget(
+        ratatui::widgets::List::new(items)
+            .block(focused_block("Collections", focused))
+            .highlight_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("> "),
         area,
+        &mut app.collection_list_state.clone(),
     );
 
     if app.debug {
         let debug_text = format!(
-            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\nurl: {:?}\nheaders: {:?}\nresponse: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}",
+            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\nurl: {:?}\nheaders: {:?}\nresponse: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\nactive_collection: {:?}",
             app.focus,
             app.active_tab,
             app.input_mode,
@@ -136,7 +151,8 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
             app.response,
             app.selected_header_row,
             app.editing_header_field.as_ref(),
-            app.headers_table_state.selected()
+            app.headers_table_state.selected(),
+            app.active_collection
         );
 
         let debug_area = Rect {

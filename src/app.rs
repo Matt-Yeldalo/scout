@@ -2,7 +2,7 @@ use crate::event::AppEvent;
 use crate::http::send;
 use crate::request::{Collection, HttpMethod, Request, Response};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::widgets::ScrollbarState;
+use ratatui::widgets::{ListState, ScrollbarState};
 use ratatui::widgets::TableState;
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -57,6 +57,9 @@ pub struct App {
     pub editing_header_field: Option<HeaderField>,
     pub headers_table_state: TableState,
     pub response_scrollbar: ScrollbarState,
+    pub active_collection: Option<usize>,
+    pub collection_list_state: ListState,
+    pub expanded_collections: Vec<usize>,
 }
 
 impl App {
@@ -82,6 +85,9 @@ impl App {
             selected_header_row: 0,
             editing_header_field: None,
             response_scrollbar: ScrollbarState::default(),
+            active_collection: None,
+            collection_list_state: ListState::default(),
+            expanded_collections: Vec::new(),
         }
     }
 
@@ -104,6 +110,17 @@ impl App {
 
     fn handle_normal_key(&mut self, key: KeyEvent) {
         match key.code {
+            KeyCode::Enter => {
+                match self.focus {
+                    Focus::Collections => {
+                        if let Some(active_collection) = self.active_collection {
+                            self.selected_collection = Some(active_collection);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
             // Quit. Raw mode intercepts Ctrl-C, so we handle it manually.
             KeyCode::Char('q') => self.should_quit = true,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -174,6 +191,19 @@ impl App {
                     }
                     _ => {}
                 },
+                _ => {}
+            },
+
+            KeyCode::Char('n') => match self.focus {
+                Focus::Collections => {
+                    self.collections.push(Collection {
+                        name: "New Collection".to_string(),
+                        requests: Vec::new(),
+                    });
+                    self.active_collection = Some(self.collections.len() - 1);
+                    self.input_mode = InputMode::Insert;
+                    self.collection_list_state.select(self.active_collection);
+                }
                 _ => {}
             },
 
@@ -260,7 +290,25 @@ impl App {
             // Esc always exits Insert mode, returning to Normal.
             KeyCode::Esc => self.input_mode = InputMode::Normal,
             _ => match self.focus {
-                Focus::Collections => {}
+                Focus::Collections => {
+                    match key.code {
+                        KeyCode::Enter => {
+                            self.input_mode = InputMode::Normal;
+                            self.collections[self.active_collection.unwrap()].requests.push(self.active_request.clone());
+                        }
+                        KeyCode::Char(c) => {
+                            if let Some(active_collection) = self.active_collection {
+                                self.collections[active_collection].name.push(c);
+                            }
+                        }
+                        KeyCode::Backspace => {
+                            if let Some(active_collection) = self.active_collection {
+                                self.collections[active_collection].name.pop();
+                            }
+                        }
+                        _ => {}
+                    }
+                }
                 Focus::RequestBuilder => match self.active_tab {
                     RequestTab::Url => {
                         let url = &mut self.active_request.url;

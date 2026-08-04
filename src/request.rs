@@ -39,6 +39,12 @@ pub struct Collection {
     pub requests: Vec<Request>,
 }
 
+impl std::fmt::Display for Collection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Collection: {}", self.name)
+    }
+}
+
 /// The result of a completed HTTP request.
 #[derive(Debug, Default, Clone)]
 pub struct Response {
