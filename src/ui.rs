@@ -107,6 +107,18 @@ fn focused_block(title: &str, focused: bool) -> Block<'_> {
 // Collections sidebar
 // ---------------------------------------------------------------------------
 
+enum ListItem {
+    Collection {
+        idx: usize,
+        name: String,
+    },
+    Request {
+        col_idx: usize,
+        req_idx: usize,
+        name: String,
+    },
+}
+
 fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
     let focused = app.focus == Focus::Collections;
 
@@ -120,12 +132,40 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    let items: Vec<Span> = app
-        .collections
-        .iter()
-        .map(|name| Span::raw(format!(" {}", name)))
-        .collect();
+    let mut flat: Vec<ListItem> = vec![];
+    for (ci, col) in app.collections.iter().enumerate() {
+        flat.push(ListItem::Collection {
+            idx: ci,
+            name: col.name.clone(),
+        });
+        if app.expanded_collections.contains(&ci) {
+            for (ri, req) in col.requests.iter().enumerate() {
+                flat.push(ListItem::Request {
+                    col_idx: ci,
+                    req_idx: ri,
+                    name: req.name.clone(),
+                });
+            }
+        }
+    }
 
+    let items: Vec<ratatui::widgets::ListItem> = flat
+        .iter()
+        .map(|item| match item {
+            ListItem::Collection { name, .. } => {
+                ratatui::widgets::ListItem::new(format!(" {}", name))
+            }
+            ListItem::Request { name, .. } => {
+                ratatui::widgets::ListItem::new(format!("   {} {}", "↳", name))
+            }
+        })
+        .collect();
+    // let items: Vec<Span> = app
+    //     .collections
+    //     .iter()
+    //     .map(|name| Span::raw(format!(" {}", name)))
+    //     .collect();
+    //
     frame.render_stateful_widget(
         ratatui::widgets::List::new(items)
             .block(focused_block("Collections", focused))

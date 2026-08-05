@@ -125,7 +125,7 @@ impl App {
             KeyCode::Enter => match self.focus {
                 Focus::Collections => {
                     if let Some(selected_collection) = self.collection_list_state.selected() {
-                        self.expanded_collections.push(selected_collection);
+                        self.handle_collection_toggle(selected_collection);
                     }
                 }
                 _ => {}
@@ -290,6 +290,14 @@ impl App {
             });
             sender.send(AppEvent::HttpResponse(response)).await.unwrap();
         });
+    }
+
+    fn handle_collection_toggle(&mut self, collection_index: usize) {
+        if let Some(pos) = self.expanded_collections.iter().position(|&i| i == collection_index) {
+            self.expanded_collections.remove(pos);
+        } else {
+            self.expanded_collections.push(collection_index);
+        }
     }
 
     fn update_collection_list_state(&mut self, collection_index: Option<usize>) {
