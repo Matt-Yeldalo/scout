@@ -140,8 +140,14 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
     );
 
     if app.debug {
+        let expanded_collections: Vec<String> = app
+            .expanded_collections
+            .iter()
+            .map(|name| name.to_string())
+            .collect();
+
         let debug_text = format!(
-            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\nurl: {:?}\nheaders: {:?}\nresponse: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\nactive_collection: {:?}",
+            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\nurl: {:?}\nheaders: {:?}\nresponse: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\ncollection_list_state: {:?}\nexpanded_collections: {:?}",
             app.focus,
             app.active_tab,
             app.input_mode,
@@ -152,7 +158,10 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
             app.selected_header_row,
             app.editing_header_field.as_ref(),
             app.headers_table_state.selected(),
-            app.active_collection
+            app.collection_list_state
+                .selected()
+                .map(|i| app.collections.get(i).cloned()),
+            expanded_collections,
         );
 
         let debug_area = Rect {

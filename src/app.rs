@@ -2,8 +2,8 @@ use crate::event::AppEvent;
 use crate::http::send;
 use crate::request::{Collection, HttpMethod, Request, Response};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::widgets::{ListState, ScrollbarState};
 use ratatui::widgets::TableState;
+use ratatui::widgets::{ListState, ScrollbarState};
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum InputMode {
@@ -73,7 +73,7 @@ impl App {
             debug: true,
             should_quit: false,
             input_mode: InputMode::Normal,
-            focus: Focus::RequestBuilder,
+            focus: Focus::Collections,
             active_tab: RequestTab::Url,
             collections: Vec::new(),
             selected_collection: None,
@@ -110,17 +110,6 @@ impl App {
 
     fn handle_normal_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Enter => {
-                match self.focus {
-                    Focus::Collections => {
-                        if let Some(active_collection) = self.active_collection {
-                            self.selected_collection = Some(active_collection);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-
             // Quit. Raw mode intercepts Ctrl-C, so we handle it manually.
             KeyCode::Char('q') => self.should_quit = true,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -128,11 +117,23 @@ impl App {
             }
 
             // Tab cycles keyboard focus between the three panels.
-            KeyCode::Tab => self.cycle_focus(),
+            KeyCode::Tab => {
+                self.cycle_focus();
+                self.tab_changed_callback();
+            }
 
-            // Enter Insert mode so the user can type into fields.
-            KeyCode::Char('i') | KeyCode::Enter => {
+            KeyCode::Enter => match self.focus {
+                Focus::Collections => {
+                    if let Some(selected_collection) = self.collection_list_state.selected() {
+                        self.expanded_collections.push(selected_collection);
+                    }
+                }
+                _ => {}
+            },
+
+            KeyCode::Char('i') => {
                 self.input_mode = InputMode::Insert;
+
                 match self.focus {
                     Focus::RequestBuilder => match self.active_tab {
                         RequestTab::Url => {}
@@ -178,6 +179,13 @@ impl App {
             },
 
             KeyCode::Char('a') => match self.focus {
+                Focus::Collections => {
+                    if let Some(selected_collection) = self.collection_list_state.selected() {
+                        if let Some(collection) = self.collections.get_mut(selected_collection) {
+                            collection.requests.push(self.active_request.clone());
+                        }
+                    }
+                }
                 Focus::RequestBuilder => match self.active_tab {
                     RequestTab::Headers => {
                         self.active_request
@@ -200,9 +208,8 @@ impl App {
                         name: "New Collection".to_string(),
                         requests: Vec::new(),
                     });
-                    self.active_collection = Some(self.collections.len() - 1);
                     self.input_mode = InputMode::Insert;
-                    self.collection_list_state.select(self.active_collection);
+                    self.update_collection_list_state(Some(self.collections.len() - 1));
                 }
                 _ => {}
             },
@@ -285,30 +292,40 @@ impl App {
         });
     }
 
+    fn update_collection_list_state(&mut self, collection_index: Option<usize>) {
+        if let Some(index) = collection_index {
+            self.collection_list_state.select(Some(index));
+        } else {
+            self.collection_list_state.select(None);
+        }
+    }
+
     fn handle_insert_key(&mut self, key: KeyEvent) {
         match key.code {
             // Esc always exits Insert mode, returning to Normal.
             KeyCode::Esc => self.input_mode = InputMode::Normal,
             _ => match self.focus {
-                Focus::Collections => {
-                    match key.code {
-                        KeyCode::Enter => {
-                            self.input_mode = InputMode::Normal;
-                            self.collections[self.active_collection.unwrap()].requests.push(self.active_request.clone());
-                        }
-                        KeyCode::Char(c) => {
-                            if let Some(active_collection) = self.active_collection {
-                                self.collections[active_collection].name.push(c);
-                            }
-                        }
-                        KeyCode::Backspace => {
-                            if let Some(active_collection) = self.active_collection {
-                                self.collections[active_collection].name.pop();
-                            }
-                        }
-                        _ => {}
+                Focus::Collections => match key.code {
+                    KeyCode::Enter => {
+                        self.input_mode = InputMode::Normal;
+                        self.collections[self.collection_list_state.selected().unwrap()]
+                            .requests
+                            .push(self.active_request.clone());
+                        let added_collection_index = self.collections.len() - 1;
+                        self.update_collection_list_state(Some(added_collection_index));
                     }
-                }
+                    KeyCode::Char(c) => {
+                        if let Some(active_collection) = self.collection_list_state.selected() {
+                            self.collections[active_collection].name.push(c);
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        if let Some(active_collection) = self.collection_list_state.selected() {
+                            self.collections[active_collection].name.pop();
+                        }
+                    }
+                    _ => {}
+                },
                 Focus::RequestBuilder => match self.active_tab {
                     RequestTab::Url => {
                         let url = &mut self.active_request.url;
@@ -418,6 +435,8 @@ impl App {
             }
         }
     }
+
+    fn tab_changed_callback(&mut self) {}
 
     /// Advance focus to the next panel (wraps around).
     fn cycle_focus(&mut self) {
