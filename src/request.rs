@@ -39,6 +39,12 @@ pub struct Collection {
     pub requests: Vec<Request>,
 }
 
+impl std::fmt::Display for Request {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} - {}", self.url, self.name)
+    }
+}
+
 impl std::fmt::Display for Collection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Collection: {}", self.name)

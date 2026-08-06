@@ -32,6 +32,13 @@ pub enum RequestTab {
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
+pub enum CollectionState {
+    #[default]
+    CollectionList,
+    RequestList(usize), // index of the selected collection
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
 pub enum HeaderField {
     #[default]
     Key,
@@ -60,6 +67,7 @@ pub struct App {
     pub active_collection: Option<usize>,
     pub collection_list_state: ListState,
     pub expanded_collections: Vec<usize>,
+    pub collection_ui_state: CollectionState,
 }
 
 impl App {
@@ -88,6 +96,7 @@ impl App {
             active_collection: None,
             collection_list_state: ListState::default(),
             expanded_collections: Vec::new(),
+            collection_ui_state: CollectionState::default(),
         }
     }
 
@@ -123,11 +132,28 @@ impl App {
             }
 
             KeyCode::Enter => match self.focus {
-                Focus::Collections => {
-                    if let Some(selected_collection) = self.collection_list_state.selected() {
-                        self.handle_collection_toggle(selected_collection);
+                Focus::Collections => match self.collection_ui_state {
+                    CollectionState::CollectionList => {
+                        if let Some(selected_collection) = self.collection_list_state.selected() {
+                            // self.handle_collection_toggle(selected_collection);
+                            self.collection_ui_state =
+                                CollectionState::RequestList(selected_collection);
+                            self.selected_request = Some(0);
+                            self.active_request = self.collections[selected_collection].requests[0].clone();
+                        }
                     }
-                }
+                    CollectionState::RequestList(collection_index) => {
+                        if let Some(selected_request) = self.selected_request {
+                            if let Some(collection) = self.collections.get(collection_index) {
+                                if let Some(request) = collection.requests.get(selected_request) {
+                                    self.active_request = request.clone();
+                                    self.active_tab = RequestTab::Url;
+                                    self.focus = Focus::RequestBuilder;
+                                }
+                            }
+                        }
+                    }
+                },
                 _ => {}
             },
 
@@ -246,6 +272,13 @@ impl App {
                     },
                     _ => {}
                 },
+                Focus::Collections => match self.collection_ui_state {
+                    CollectionState::RequestList(_) => {
+                        self.collection_ui_state = CollectionState::CollectionList;
+                        self.selected_request = None;
+                    }
+                    _ => {}
+                },
                 _ => {}
             },
             KeyCode::Up => match self.focus {
@@ -293,7 +326,11 @@ impl App {
     }
 
     fn handle_collection_toggle(&mut self, collection_index: usize) {
-        if let Some(pos) = self.expanded_collections.iter().position(|&i| i == collection_index) {
+        if let Some(pos) = self
+            .expanded_collections
+            .iter()
+            .position(|&i| i == collection_index)
+        {
             self.expanded_collections.remove(pos);
         } else {
             self.expanded_collections.push(collection_index);
@@ -313,27 +350,7 @@ impl App {
             // Esc always exits Insert mode, returning to Normal.
             KeyCode::Esc => self.input_mode = InputMode::Normal,
             _ => match self.focus {
-                Focus::Collections => match key.code {
-                    KeyCode::Enter => {
-                        self.input_mode = InputMode::Normal;
-                        self.collections[self.collection_list_state.selected().unwrap()]
-                            .requests
-                            .push(self.active_request.clone());
-                        let added_collection_index = self.collections.len() - 1;
-                        self.update_collection_list_state(Some(added_collection_index));
-                    }
-                    KeyCode::Char(c) => {
-                        if let Some(active_collection) = self.collection_list_state.selected() {
-                            self.collections[active_collection].name.push(c);
-                        }
-                    }
-                    KeyCode::Backspace => {
-                        if let Some(active_collection) = self.collection_list_state.selected() {
-                            self.collections[active_collection].name.pop();
-                        }
-                    }
-                    _ => {}
-                },
+                Focus::Collections => self.handle_insert_collection(key),
                 Focus::RequestBuilder => match self.active_tab {
                     RequestTab::Url => {
                         let url = &mut self.active_request.url;
@@ -355,6 +372,56 @@ impl App {
                     RequestTab::Auth => {}
                 },
                 Focus::Response => {}
+                _ => {}
+            },
+        }
+    }
+
+    fn handle_insert_collection(&mut self, key: KeyEvent) {
+        match self.collection_ui_state {
+            CollectionState::CollectionList => match key.code {
+                KeyCode::Enter => {
+                    self.input_mode = InputMode::Normal;
+                    self.collections[self.collection_list_state.selected().unwrap()]
+                        .requests
+                        .push(self.active_request.clone());
+                    let added_collection_index = self.collections.len() - 1;
+                    self.update_collection_list_state(Some(added_collection_index));
+                }
+                KeyCode::Char(c) => {
+                    if let Some(active_collection) = self.collection_list_state.selected() {
+                        self.collections[active_collection].name.push(c);
+                    }
+                }
+                KeyCode::Backspace => {
+                    if let Some(active_collection) = self.collection_list_state.selected() {
+                        self.collections[active_collection].name.pop();
+                    }
+                }
+                _ => {}
+            },
+            CollectionState::RequestList(_) => match key.code {
+                KeyCode::Enter => {
+                    self.input_mode = InputMode::Normal;
+                }
+                KeyCode::Char(c) => {
+                    if let Some(active_collection) = self.collection_list_state.selected() {
+                        if let Some(selected_request) = self.selected_request {
+                            self.collections[active_collection].requests[selected_request]
+                                .name
+                                .push(c);
+                        }
+                    }
+                }
+                KeyCode::Backspace => {
+                    if let Some(active_collection) = self.collection_list_state.selected() {
+                        if let Some(selected_request) = self.selected_request {
+                            self.collections[active_collection].requests[selected_request]
+                                .name
+                                .pop();
+                        }
+                    }
+                }
                 _ => {}
             },
         }

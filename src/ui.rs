@@ -1,4 +1,4 @@
-use crate::app::{App, Focus, InputMode, RequestTab};
+use crate::app::{App, CollectionState, Focus, InputMode, RequestTab};
 use crate::request::HttpMethod;
 use ratatui::layout::Margin;
 use ratatui::widgets::{Scrollbar, ScrollbarOrientation};
@@ -122,62 +122,12 @@ enum ListItem {
 fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
     let focused = app.focus == Focus::Collections;
 
-    if app.collections.is_empty() {
-        frame.render_widget(
-            Paragraph::new("(empty)\n\nPress [n] to create\na new request.")
-                .style(Style::default().fg(Color::DarkGray))
-                .block(focused_block("Collections", focused)),
-            area,
-        );
-        return;
-    }
-
-    let mut flat: Vec<ListItem> = vec![];
-    for (ci, col) in app.collections.iter().enumerate() {
-        flat.push(ListItem::Collection {
-            idx: ci,
-            name: col.name.clone(),
-        });
-        if app.expanded_collections.contains(&ci) {
-            for (ri, req) in col.requests.iter().enumerate() {
-                flat.push(ListItem::Request {
-                    col_idx: ci,
-                    req_idx: ri,
-                    name: req.name.clone(),
-                });
-            }
+    match app.collection_ui_state {
+        CollectionState::RequestList(_) => {
+            render_collection_request_list(frame, app, area, focused)
         }
+        CollectionState::CollectionList => render_collection_list(frame, app, area, focused),
     }
-
-    let items: Vec<ratatui::widgets::ListItem> = flat
-        .iter()
-        .map(|item| match item {
-            ListItem::Collection { name, .. } => {
-                ratatui::widgets::ListItem::new(format!(" {}", name))
-            }
-            ListItem::Request { name, .. } => {
-                ratatui::widgets::ListItem::new(format!("   {} {}", "↳", name))
-            }
-        })
-        .collect();
-    // let items: Vec<Span> = app
-    //     .collections
-    //     .iter()
-    //     .map(|name| Span::raw(format!(" {}", name)))
-    //     .collect();
-    //
-    frame.render_stateful_widget(
-        ratatui::widgets::List::new(items)
-            .block(focused_block("Collections", focused))
-            .highlight_style(
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol("> "),
-        area,
-        &mut app.collection_list_state.clone(),
-    );
 
     if app.debug {
         let expanded_collections: Vec<String> = app
@@ -187,10 +137,11 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
             .collect();
 
         let debug_text = format!(
-            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\nurl: {:?}\nheaders: {:?}\nresponse: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\ncollection_list_state: {:?}\nexpanded_collections: {:?}",
+            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\n active_request - name: {:?}\nactive_request - url: {:?}\nactive_request - headers: {:?}\nactive_request - response: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\ncollection_list_state: {:?}\nexpanded_collections: {:?}\ncollection_ui_state: {:?}",
             app.focus,
             app.active_tab,
             app.input_mode,
+            app.active_request.name,
             app.active_request.method,
             app.active_request.url,
             app.active_request.headers,
@@ -200,8 +151,10 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
             app.headers_table_state.selected(),
             app.collection_list_state
                 .selected()
-                .map(|i| app.collections.get(i).cloned()),
+                // .map(|i| app.collections.get(i).cloned()),
+                .map(|i| format!("\n{}: {}", i, app.collections.get(i).map(|c| c.name.clone()).unwrap_or_default())),
             expanded_collections,
+            app.collection_ui_state
         );
 
         let debug_area = Rect {
@@ -216,6 +169,72 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
                 .style(Style::default().fg(Color::LightYellow))
                 .block(Block::default().title("Debug").borders(Borders::ALL)),
             debug_area,
+        );
+    }
+}
+
+fn render_collection_list(frame: &mut Frame, app: &App, area: Rect, focused: bool) {
+    let items: Vec<ratatui::widgets::ListItem> = app
+        .collections
+        .iter()
+        .enumerate()
+        .map(|(i, col)| {
+            let prefix = if app.expanded_collections.contains(&i) {
+                "▼"
+            } else {
+                "▶"
+            };
+            ratatui::widgets::ListItem::new(format!(" {} {}", prefix, col.name))
+        })
+        .collect();
+
+    frame.render_stateful_widget(
+        ratatui::widgets::List::new(items)
+            .block(focused_block("Collections", focused))
+            .highlight_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("> "),
+        area,
+        &mut app.collection_list_state.clone(),
+    );
+}
+
+fn render_collection_request_list(frame: &mut Frame, app: &App, area: Rect, focused: bool) {
+    let selected_collection = app
+        .collection_list_state
+        .selected()
+        .and_then(|i| app.collections.get(i));
+
+    if let Some(collection) = selected_collection {
+        let items: Vec<ratatui::widgets::ListItem> = collection
+            .requests
+            .iter()
+            // .map(|req| ratatui::widgets::ListItem::new(format!("   {} {}", "↳", req.name)))
+            .map(|req| ratatui::widgets::ListItem::new(format!("   {}", req)))
+            .collect();
+        let title = format!("Requests ({})", collection.name);
+
+        frame.render_stateful_widget(
+            ratatui::widgets::List::new(items)
+                .block(focused_block(title.as_str(), focused))
+                .highlight_style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .highlight_symbol("> "),
+            area,
+            &mut app.collection_list_state.clone(),
+        );
+    } else {
+        frame.render_widget(
+            Paragraph::new("(no collection selected)")
+                .style(Style::default().fg(Color::DarkGray))
+                .block(focused_block("Requests", focused)),
+            area,
         );
     }
 }
