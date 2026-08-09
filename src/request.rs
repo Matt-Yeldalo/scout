@@ -41,7 +41,12 @@ pub struct Collection {
 
 impl std::fmt::Display for Request {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} - {}", self.url, self.name)
+        let method = match self.method {
+            HttpMethod::Get => "GET",
+            HttpMethod::Post => "POST",
+        };
+
+        write!(f, "{} {} ({})", method, self.url, self.name)
     }
 }
 

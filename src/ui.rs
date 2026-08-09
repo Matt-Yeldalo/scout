@@ -137,7 +137,7 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
             .collect();
 
         let debug_text = format!(
-            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\n active_request - name: {:?}\nactive_request - url: {:?}\nactive_request - headers: {:?}\nactive_request - response: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\ncollection_list_state: {:?}\nexpanded_collections: {:?}\ncollection_ui_state: {:?}",
+            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\nactive_request - name: {:?}\nactive_request - url: {:?}\nactive_request - headers: {:?}\nactive_request - response: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\ncollection_list_state: {:?}\nexpanded_collections: {:?}\ncollection_ui_state: {:?}\nrequest_list_state: {:?}",
             app.focus,
             app.active_tab,
             app.input_mode,
@@ -152,9 +152,25 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
             app.collection_list_state
                 .selected()
                 // .map(|i| app.collections.get(i).cloned()),
-                .map(|i| format!("\n{}: {}", i, app.collections.get(i).map(|c| c.name.clone()).unwrap_or_default())),
+                .map(|i| format!(
+                    "\n{}: {}",
+                    i,
+                    app.collections
+                        .get(i)
+                        .map(|c| c.name.clone())
+                        .unwrap_or_default()
+                )),
             expanded_collections,
-            app.collection_ui_state
+            app.collection_ui_state,
+            app.request_list_state.selected().map(|i| format!(
+                "\n{}: {}",
+                i,
+                app.collections
+                    .get(app.collection_list_state.selected().unwrap_or(0))
+                    .and_then(|c| c.requests.get(i))
+                    .map(|r| r.name.clone())
+                    .unwrap_or_default()
+            ))
         );
 
         let debug_area = Rect {
@@ -227,7 +243,7 @@ fn render_collection_request_list(frame: &mut Frame, app: &App, area: Rect, focu
                 )
                 .highlight_symbol("> "),
             area,
-            &mut app.collection_list_state.clone(),
+            &mut app.request_list_state.clone(),
         );
     } else {
         frame.render_widget(

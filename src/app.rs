@@ -66,6 +66,7 @@ pub struct App {
     pub response_scrollbar: ScrollbarState,
     pub active_collection: Option<usize>,
     pub collection_list_state: ListState,
+    pub request_list_state: ListState,
     pub expanded_collections: Vec<usize>,
     pub collection_ui_state: CollectionState,
 }
@@ -95,6 +96,7 @@ impl App {
             response_scrollbar: ScrollbarState::default(),
             active_collection: None,
             collection_list_state: ListState::default(),
+            request_list_state: ListState::default(),
             expanded_collections: Vec::new(),
             collection_ui_state: CollectionState::default(),
         }
@@ -135,15 +137,15 @@ impl App {
                 Focus::Collections => match self.collection_ui_state {
                     CollectionState::CollectionList => {
                         if let Some(selected_collection) = self.collection_list_state.selected() {
-                            // self.handle_collection_toggle(selected_collection);
                             self.collection_ui_state =
                                 CollectionState::RequestList(selected_collection);
-                            self.selected_request = Some(0);
-                            self.active_request = self.collections[selected_collection].requests[0].clone();
+                            self.request_list_state.select(Some(0));
+                            // self.selected_request = Some(0);
+                            // self.active_request = self.collections[selected_collection].requests[0].clone();
                         }
                     }
                     CollectionState::RequestList(collection_index) => {
-                        if let Some(selected_request) = self.selected_request {
+                        if let Some(selected_request) = self.request_list_state.selected() {
                             if let Some(collection) = self.collections.get(collection_index) {
                                 if let Some(request) = collection.requests.get(selected_request) {
                                     self.active_request = request.clone();
@@ -281,7 +283,23 @@ impl App {
                 },
                 _ => {}
             },
-            KeyCode::Up => match self.focus {
+            KeyCode::Up | KeyCode::Char('k') => match self.focus {
+                Focus::Collections => match self.collection_ui_state {
+                    CollectionState::CollectionList => {
+                        if let Some(selected) = self.collection_list_state.selected() {
+                            if selected > 0 {
+                                self.collection_list_state.select(Some(selected - 1));
+                            }
+                        }
+                    }
+                    CollectionState::RequestList(collection_index) => {
+                        if let Some(selected) = self.request_list_state.selected() {
+                            if selected > 0 {
+                                self.request_list_state.select(Some(selected - 1));
+                            }
+                        }
+                    }
+                },
                 Focus::RequestBuilder => match self.active_tab {
                     RequestTab::Headers => {
                         if self.selected_header_row > 0 {
@@ -293,7 +311,29 @@ impl App {
                 },
                 _ => {}
             },
-            KeyCode::Down => match self.focus {
+            KeyCode::Down | KeyCode::Char('j') => match self.focus {
+                Focus::Collections => match self.collection_ui_state {
+                    CollectionState::CollectionList => {
+                        if let Some(selected) = self.collection_list_state.selected() {
+                            if selected < self.collections.len() - 1 {
+                                self.collection_list_state.select(Some(selected + 1));
+                            }
+                        } else if !self.collections.is_empty() {
+                            self.collection_list_state.select(Some(0));
+                        }
+                    }
+                    CollectionState::RequestList(collection_index) => {
+                        if let Some(collection) = self.collections.get(collection_index) {
+                            if let Some(selected) = self.request_list_state.selected() {
+                                if selected < collection.requests.len() - 1 {
+                                    self.request_list_state.select(Some(selected + 1));
+                                }
+                            } else if !collection.requests.is_empty() {
+                                self.request_list_state.select(Some(0));
+                            }
+                        }
+                    }
+                },
                 Focus::RequestBuilder => match self.active_tab {
                     RequestTab::Headers => {
                         if self.selected_header_row < self.active_request.headers.len() - 1 {
@@ -360,6 +400,7 @@ impl App {
                             // focus panels need
                             KeyCode::Enter => {
                                 self.input_mode = InputMode::Normal;
+                                self.update_request();
                             }
                             KeyCode::Backspace => {
                                 url.pop();
@@ -374,6 +415,18 @@ impl App {
                 Focus::Response => {}
                 _ => {}
             },
+        }
+    }
+
+    fn update_request(&mut self) {
+        if let Some(selected_collection) = self.collection_list_state.selected() {
+            if let Some(selected_request) = self.request_list_state.selected() {
+                if let Some(collection) = self.collections.get_mut(selected_collection) {
+                    if let Some(request) = collection.requests.get_mut(selected_request) {
+                        *request = self.active_request.clone();
+                    }
+                }
+            }
         }
     }
 
@@ -406,7 +459,7 @@ impl App {
                 }
                 KeyCode::Char(c) => {
                     if let Some(active_collection) = self.collection_list_state.selected() {
-                        if let Some(selected_request) = self.selected_request {
+                        if let Some(selected_request) = self.request_list_state.selected() {
                             self.collections[active_collection].requests[selected_request]
                                 .name
                                 .push(c);
@@ -415,7 +468,7 @@ impl App {
                 }
                 KeyCode::Backspace => {
                     if let Some(active_collection) = self.collection_list_state.selected() {
-                        if let Some(selected_request) = self.selected_request {
+                        if let Some(selected_request) = self.request_list_state.selected() {
                             self.collections[active_collection].requests[selected_request]
                                 .name
                                 .pop();
