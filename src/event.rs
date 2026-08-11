@@ -22,12 +22,10 @@ pub async fn next(
     event_stream: &mut crossterm::event::EventStream,
 ) -> Result<AppEvent> {
     tokio::select! {
-        // maybe_event = event_stream.try_next() => {
         maybe_event = futures::StreamExt::next(event_stream) => {
             if let Some(Ok(Event::Key(key))) = maybe_event {
                 return Ok(AppEvent::Key(key));
             } else{
-                // return Err(anyhow::anyhow!("Failed to read event"));
                 return Ok(AppEvent::Key(KeyEvent::from(crossterm::event::KeyCode::Null)));
             }
         }

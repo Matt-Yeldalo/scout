@@ -29,6 +29,7 @@ pub struct Request {
     pub method: HttpMethod,
     pub url: String,
     pub headers: Vec<(String, String)>,
+    #[serde(default)]
     pub body: Option<String>,
     pub auth: Auth,
 }

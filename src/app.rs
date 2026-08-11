@@ -2,8 +2,8 @@ use crate::event::AppEvent;
 use crate::http::send;
 use crate::request::{Collection, HttpMethod, Request, Response};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::widgets::TableState;
-use ratatui::widgets::{ListState, ScrollbarState};
+use ratatui::widgets::{ListState, ScrollbarState, TableState};
+use tui_textarea::{CursorMove, Input, TextArea};
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum InputMode {
@@ -69,6 +69,7 @@ pub struct App {
     pub request_list_state: ListState,
     pub expanded_collections: Vec<usize>,
     pub collection_ui_state: CollectionState,
+    pub body_editor: TextArea<'static>,
 }
 
 impl App {
@@ -99,12 +100,13 @@ impl App {
             request_list_state: ListState::default(),
             expanded_collections: Vec::new(),
             collection_ui_state: CollectionState::default(),
+            body_editor: TextArea::default(),
         }
     }
 
     pub fn update(&mut self, event: AppEvent) {
         match event {
-            AppEvent::Key(key) => self.handle_key(key),
+            AppEvent::Key(key) => self.handle_key(key, event),
             AppEvent::HttpResponse(response) => {
                 self.response = Some(response);
                 self.is_loading = false;
@@ -112,14 +114,14 @@ impl App {
         }
     }
 
-    fn handle_key(&mut self, key: KeyEvent) {
+    fn handle_key(&mut self, key: KeyEvent, event: AppEvent) {
         match self.input_mode {
-            InputMode::Normal => self.handle_normal_key(key),
-            InputMode::Insert => self.handle_insert_key(key),
+            InputMode::Normal => self.handle_normal_key(key, event),
+            InputMode::Insert => self.handle_insert_key(key, event),
         }
     }
 
-    fn handle_normal_key(&mut self, key: KeyEvent) {
+    fn handle_normal_key(&mut self, key: KeyEvent, event: AppEvent) {
         match key.code {
             // Quit. Raw mode intercepts Ctrl-C, so we handle it manually.
             KeyCode::Char('q') => self.should_quit = true,
@@ -173,7 +175,11 @@ impl App {
                                 _ => self.editing_header_field = Some(HeaderField::Key),
                             }
                         }
-                        RequestTab::Body => {}
+                        RequestTab::Body => {
+                            if let Some(body) = &self.active_request.body {
+                                self.body_editor = TextArea::from(body.lines());
+                            }
+                        }
                         RequestTab::Auth => {}
                     },
                     _ => {}
@@ -385,36 +391,34 @@ impl App {
         }
     }
 
-    fn handle_insert_key(&mut self, key: KeyEvent) {
-        match key.code {
-            // Esc always exits Insert mode, returning to Normal.
-            KeyCode::Esc => self.input_mode = InputMode::Normal,
-            _ => match self.focus {
-                Focus::Collections => self.handle_insert_collection(key),
-                Focus::RequestBuilder => match self.active_tab {
-                    RequestTab::Url => {
-                        let url = &mut self.active_request.url;
-                        match key.code {
-                            KeyCode::Char(c) => url.push(c),
-                            // NOTE: This may be moved up in the chain depending on what the other
-                            // focus panels need
-                            KeyCode::Enter => {
-                                self.input_mode = InputMode::Normal;
-                                self.update_request();
-                            }
-                            KeyCode::Backspace => {
-                                url.pop();
-                            }
-                            _ => {}
+    fn handle_insert_key(&mut self, key: KeyEvent, event: AppEvent) {
+        // Esc always exits Insert mode, returning to Normal.
+        // KeyCode::Esc => self.input_mode = InputMode::Normal,
+        match self.focus {
+            Focus::Collections => self.handle_insert_collection(key),
+            Focus::RequestBuilder => match self.active_tab {
+                RequestTab::Url => {
+                    let url = &mut self.active_request.url;
+                    match key.code {
+                        KeyCode::Char(c) => url.push(c),
+                        // NOTE: This may be moved up in the chain depending on what the other
+                        // focus panels need
+                        KeyCode::Enter => {
+                            self.input_mode = InputMode::Normal;
+                            self.update_request();
                         }
+                        KeyCode::Backspace => {
+                            url.pop();
+                        }
+                        _ => {}
                     }
-                    RequestTab::Headers => self.handle_insert_header(key),
-                    RequestTab::Body => {}
-                    RequestTab::Auth => {}
-                },
-                Focus::Response => {}
-                _ => {}
+                }
+                RequestTab::Headers => self.handle_insert_header(key),
+                RequestTab::Body => self.handle_insert_body(key, event),
+                RequestTab::Auth => {}
             },
+            Focus::Response => {}
+            _ => {}
         }
     }
 
@@ -433,6 +437,7 @@ impl App {
     fn handle_insert_collection(&mut self, key: KeyEvent) {
         match self.collection_ui_state {
             CollectionState::CollectionList => match key.code {
+                KeyCode::Esc => self.input_mode = InputMode::Normal,
                 KeyCode::Enter => {
                     self.input_mode = InputMode::Normal;
                     self.collections[self.collection_list_state.selected().unwrap()]
@@ -454,6 +459,7 @@ impl App {
                 _ => {}
             },
             CollectionState::RequestList(_) => match key.code {
+                KeyCode::Esc => self.input_mode = InputMode::Normal,
                 KeyCode::Enter => {
                     self.input_mode = InputMode::Normal;
                 }
@@ -477,6 +483,39 @@ impl App {
                 }
                 _ => {}
             },
+        }
+    }
+
+    fn handle_insert_body(&mut self, key: KeyEvent, event: AppEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.input_mode = InputMode::Normal;
+                self.active_request.body = Some(self.body_editor.lines().join("\n"));
+                self.body_editor = TextArea::default();
+                self.update_request();
+            }
+            KeyCode::Char(c) => {
+                self.body_editor.insert_char(c);
+            }
+            KeyCode::Enter => {
+                self.body_editor.insert_newline();
+            }
+            KeyCode::Backspace => {
+                self.body_editor.delete_char();
+            }
+            KeyCode::Left => {
+                self.body_editor.move_cursor(CursorMove::Back);
+            }
+            KeyCode::Right => {
+                self.body_editor.move_cursor(CursorMove::Forward);
+            }
+            KeyCode::Up => {
+                self.body_editor.move_cursor(CursorMove::Up);
+            }
+            KeyCode::Down => {
+                self.body_editor.move_cursor(CursorMove::Down);
+            }
+            _ => {}
         }
     }
 

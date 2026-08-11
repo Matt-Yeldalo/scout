@@ -137,7 +137,7 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
             .collect();
 
         let debug_text = format!(
-            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\nactive_request - name: {:?}\nactive_request - url: {:?}\nactive_request - headers: {:?}\nactive_request - response: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\ncollection_list_state: {:?}\nexpanded_collections: {:?}\ncollection_ui_state: {:?}\nrequest_list_state: {:?}",
+            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\nactive_request - name: {:?}\nactive_request - url: {:?}\nactive_request - headers: {:?}\nactive_request - response: {:?}\nactive_request - body: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\ncollection_list_state: {:?}\nexpanded_collections: {:?}\ncollection_ui_state: {:?}\nrequest_list_state: {:?}\nbody_editor_lines: {:?}",
             app.focus,
             app.active_tab,
             app.input_mode,
@@ -145,6 +145,7 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
             app.active_request.method,
             app.active_request.url,
             app.active_request.headers,
+            app.active_request.body,
             app.response,
             app.selected_header_row,
             app.editing_header_field.as_ref(),
@@ -170,7 +171,8 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
                     .and_then(|c| c.requests.get(i))
                     .map(|r| r.name.clone())
                     .unwrap_or_default()
-            ))
+            )),
+            app.body_editor.lines().join("\n")
         );
 
         let debug_area = Rect {
@@ -304,7 +306,7 @@ fn render_request_builder(frame: &mut Frame, app: &App, area: Rect) {
     match app.active_tab {
         RequestTab::Url => render_url_tab(frame, app, content_area),
         RequestTab::Headers => render_headers_tab(frame, app, content_area),
-        RequestTab::Body => render_placeholder(frame, "Body — issue #7", content_area),
+        RequestTab::Body => render_body_tab(frame, app, content_area),
         RequestTab::Auth => render_placeholder(frame, "Auth — issue #8", content_area),
     }
 }
@@ -374,6 +376,19 @@ fn render_headers_tab(frame: &mut Frame, app: &App, area: Rect) {
         .highlight_symbol("> "),
         area,
         &mut headers_state,
+    );
+}
+
+fn render_body_tab(frame: &mut Frame, app: &App, area: Rect) {
+    let request_body = app.active_request.body.as_deref().unwrap_or_default();
+    if request_body.is_empty() {
+        render_placeholder(frame, "(no body)", area);
+        return;
+    }
+
+    frame.render_widget(
+        Paragraph::new(request_body).style(Style::default().fg(Color::White)),
+        area,
     );
 }
 

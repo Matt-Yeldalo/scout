@@ -201,13 +201,12 @@ _Touches: `http.rs`, `app.rs`, `event.rs`, `main.rs`_
 Make the URL field editable in Insert mode (basic left/right/backspace/delete cursor).
 Toggle method between GET and POST with `m` in Normal mode.
 _Touches: `app.rs`, `ui.rs`, `event.rs`_
--->
-
 ### #6 — Headers tab
 
 Editable key/value list for request headers. Navigate rows with `j`/`k`, add a new row
-with `a`, delete selected row with `d`, edit values in Insert mode.  
+with `a`, delete selected row with `d`, edit values in Insert mode.
 _Touches: `app.rs`, `ui.rs`, `event.rs`_
+-->
 
 ### #7 — Body tab
 
