@@ -386,10 +386,14 @@ fn render_body_tab(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    frame.render_widget(
-        Paragraph::new(request_body).style(Style::default().fg(Color::White)),
-        area,
-    );
+    // let textarea = app.body_editor.clone();
+
+    frame.render_widget(&app.body_editor, area);
+
+    // frame.render_widget(
+    //     Paragraph::new(request_body).style(Style::default().fg(Color::White)),
+    //     area,
+    // );
 }
 
 fn render_placeholder(frame: &mut Frame, label: &str, area: Rect) {
