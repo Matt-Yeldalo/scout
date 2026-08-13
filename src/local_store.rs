@@ -149,8 +149,26 @@ impl LocalStore {
     }
 
     pub fn load_all(&self) -> Result<Vec<Collection>, String> {
-        // Implement loading all collections logic here
-        Ok(vec![])
+        let mut collections = Vec::new();
+        if !self.data_path.exists() {
+            return Ok(collections);
+        }
+
+        for entry in std::fs::read_dir(&self.data_path).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            if path.is_dir() {
+                let collection_data_file = path.join("collection.json");
+                if collection_data_file.exists() {
+                    let file = std::fs::File::open(&collection_data_file).map_err(|e| e.to_string())?;
+                    let reader = std::io::BufReader::new(file);
+                    let collection: Collection = serde_json::from_reader(reader).map_err(|e| e.to_string())?;
+                    collections.push(collection);
+                }
+            }
+        }
+
+        Ok(collections)
     }
 
     fn validate_response_file(&self, key: &StoreKey) -> bool {

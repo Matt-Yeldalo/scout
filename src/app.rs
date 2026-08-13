@@ -102,8 +102,9 @@ impl App {
         sender: tokio::sync::mpsc::Sender<AppEvent>,
         headers_table_state: TableState,
     ) -> Self {
+        let local_store = LocalStore::new();
         Self {
-            local_store: LocalStore::new(),
+            local_store: local_store.clone(),
             sender,
             headers_table_state,
             debug: true,
@@ -111,7 +112,7 @@ impl App {
             input_mode: InputMode::Normal,
             focus: Focus::Collections,
             active_tab: RequestTab::Url,
-            collections: Vec::new(),
+            collections: local_store.load_all().unwrap_or_else(|_| Vec::new()),
             selected_collection: None,
             selected_request: None,
             active_request: Request::new(),

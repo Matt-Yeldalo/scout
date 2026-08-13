@@ -1,5 +1,6 @@
 use crate::app::{App, CollectionState, Focus, InputMode, RequestTab};
 use crate::request::HttpMethod;
+use crate::toolbar::toolbar_hints;
 use ratatui::layout::Margin;
 use ratatui::style::Stylize;
 use ratatui::widgets::{Scrollbar, ScrollbarOrientation};
@@ -522,12 +523,23 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     // Show context-sensitive hints so the user always knows what keys do something.
-    let hints = match app.input_mode {
-        InputMode::Normal => {
-            "  [tab] cycle focus   [h/l] switch tab   [i] insert   [m] method   [s] send   [q] quit"
-        }
-        InputMode::Insert => "  [esc] back to normal",
-    };
+    // let hints = match app.input_mode {
+    //     InputMode::Normal => {
+    //         "  [tab] cycle focus   [h/l] switch tab   [i] insert   [m] method   [s] send   [q] quit"
+    //     }
+    //     InputMode::Insert => "  [esc] back to normal",
+    // };
+
+    // how do I use this method that live in src/toolbar.rs?
+    // you can call the `toolbar_hints` function from the `toolbar` module. First, make sure to import it at the top of your file:
+    // use crate::toolbar::toolbar_hints;
+    // Then, you can call it like this:
+    // its saying could not find in crate root
+    // I added mod toolbar but now it wants me to to move the toolbar.rs file into a folder called toolbar and rename it mod.rs. I don't want to do that. I just want to call the function in toolbar.rs from ui.rs. How do I do that?
+    // You can call the function directly by using the module path. Since `toolbar.rs`
+    // is in the same directory as `ui.rs`, you can call the function like this:
+    //
+    let hints = toolbar_hints(app);
 
     // `Line::from` builds a single terminal line from styled `Span`s.
     // Spans within a Line share the same row but can have different styles.

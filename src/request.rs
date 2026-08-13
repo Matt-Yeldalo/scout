@@ -57,12 +57,12 @@ impl std::fmt::Display for Request {
             HttpMethod::Post => "POST",
         };
 
-        write!(
-            f,
-            "id: {}\nn: {}\nm: {}\nu: {}\nh: {:?}\nb: {:?}\na: {:?}",
-            self.id, self.name, method, self.url, self.headers, self.body, self.auth
-        )
-        // write!(f, "{} {} {} ({})", self.id, method, self.url, self.name)
+        // write!(
+        //     f,
+        //     "id: {}\nn: {}\nm: {}\nu: {}\nh: {:?}\nb: {:?}\na: {:?}",
+        //     self.id, self.name, method, self.url, self.headers, self.body, self.auth
+        // )
+        write!(f, "{} {} ({})", method, self.url, self.name)
     }
 }
 

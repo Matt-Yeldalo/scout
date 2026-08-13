@@ -4,6 +4,7 @@ mod http;
 mod request;
 mod ui;
 mod local_store;
+mod toolbar;
 
 use crate::event::AppEvent;
 use anyhow::Result;
