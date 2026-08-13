@@ -3,6 +3,7 @@ mod event;
 mod http;
 mod request;
 mod ui;
+mod local_store;
 
 use crate::event::AppEvent;
 use anyhow::Result;

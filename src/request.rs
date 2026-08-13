@@ -23,6 +23,7 @@ pub enum Auth {
     },
 }
 
+// TODO: add ability to lock to prevent save_all from overwriting
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Request {
     pub name: String,
@@ -32,12 +33,21 @@ pub struct Request {
     #[serde(default)]
     pub body: Option<String>,
     pub auth: Auth,
+    pub id: String,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct Collection {
-    pub name: String,
-    pub requests: Vec<Request>,
+impl Request {
+    pub fn new() -> Self {
+        Self {
+            name: String::new(),
+            method: HttpMethod::Get,
+            url: String::new(),
+            headers: Vec::new(),
+            body: None,
+            auth: Auth::None,
+            id: uuid::Uuid::new_v4().to_string(),
+        }
+    }
 }
 
 impl std::fmt::Display for Request {
@@ -47,18 +57,16 @@ impl std::fmt::Display for Request {
             HttpMethod::Post => "POST",
         };
 
-        write!(f, "{} {} ({})", method, self.url, self.name)
+        write!(
+            f,
+            "id: {}\nn: {}\nm: {}\nu: {}\nh: {:?}\nb: {:?}\na: {:?}",
+            self.id, self.name, method, self.url, self.headers, self.body, self.auth
+        )
+        // write!(f, "{} {} {} ({})", self.id, method, self.url, self.name)
     }
 }
 
-impl std::fmt::Display for Collection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Collection: {}", self.name)
-    }
-}
-
-/// The result of a completed HTTP request.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Response {
     pub status: u16,
     pub status_text: String,

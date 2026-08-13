@@ -1,9 +1,14 @@
-use crate::event::AppEvent;
-use crate::http::send;
-use crate::request::{Collection, HttpMethod, Request, Response};
+use crate::{event::AppEvent, http::send};
+use crate::{
+    local_store::StoreKey,
+    local_store::LocalStore,
+    request::{HttpMethod, Request, Response},
+};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::{ListState, ScrollbarState, TableState};
-use tui_textarea::{CursorMove, Input, TextArea};
+use serde::{Deserialize, Serialize};
+use tui_textarea::{CursorMove, TextArea};
+use uuid::Uuid;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum InputMode {
@@ -31,6 +36,25 @@ pub enum RequestTab {
     Auth,
 }
 
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct Collection {
+    pub id: String,
+    pub name: String,
+    pub requests: Vec<Request>,
+}
+
+impl std::fmt::Display for Collection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "id: {}, name: {}, requests: {}",
+            self.id,
+            self.name,
+            self.requests.len()
+        )
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum CollectionState {
     #[default]
@@ -47,6 +71,7 @@ pub enum HeaderField {
 
 #[derive(Clone)]
 pub struct App {
+    pub local_store: LocalStore,
     pub debug: bool,
     pub should_quit: bool,
     pub input_mode: InputMode,
@@ -78,6 +103,7 @@ impl App {
         headers_table_state: TableState,
     ) -> Self {
         Self {
+            local_store: LocalStore::new(),
             sender,
             headers_table_state,
             debug: true,
@@ -88,7 +114,7 @@ impl App {
             collections: Vec::new(),
             selected_collection: None,
             selected_request: None,
-            active_request: Request::default(),
+            active_request: Request::new(),
             response: None,
             is_loading: false,
             error_message: None,
@@ -103,13 +129,43 @@ impl App {
             body_editor: TextArea::default(),
         }
     }
+    fn load_collections(&mut self) {
+        match self.local_store.load_all() {
+            Ok(collections) => {
+                self.collections = collections;
+                if !self.collections.is_empty() {
+                    self.collection_list_state.select(Some(0));
+                }
+            }
+            Err(e) => {
+                self.error_message = Some(format!("Error loading collections: {}", e));
+            }
+        }
+    }
 
     pub fn update(&mut self, event: AppEvent) {
         match event {
             AppEvent::Key(key) => self.handle_key(key, event),
             AppEvent::HttpResponse(response) => {
+                let collection = self
+                    .collections
+                    .get(self.active_collection.unwrap_or(0))
+                    .cloned();
+                let collection = match collection {
+                    Some(c) => c,
+                    None => {
+                        self.error_message = Some("No active collection to save response".to_string());
+                        return;
+                    }
+                };
                 self.response = Some(response);
                 self.is_loading = false;
+
+                let response = self.response.clone().unwrap();
+
+                // maybe consider making key private again and letting local state handle conversion
+                let key = StoreKey::from(&collection, &self.active_request);
+                self.local_store.update_responses(key, &response);
             }
         }
     }
@@ -186,7 +242,19 @@ impl App {
                 }
             }
 
-            KeyCode::Char('s') => self.handle_send_request(),
+            KeyCode::Char('s') => match self.focus {
+                Focus::Collections => {
+                    self.local_store
+                        .save_all(self.collections.clone())
+                        .unwrap_or_else(|e| {
+                            self.error_message = Some(format!("Error saving collections: {}", e));
+                        });
+                    // TODO: message to user - need to think about generic way to do this
+                    // this will be used for other messages as well, like errors, etc.
+                }
+                Focus::RequestBuilder => self.handle_send_request(),
+                _ => {}
+            },
 
             KeyCode::Char('h') => match self.focus {
                 Focus::RequestBuilder => match self.active_tab {
@@ -238,7 +306,9 @@ impl App {
 
             KeyCode::Char('n') => match self.focus {
                 Focus::Collections => {
+                    let id = Uuid::new_v4().to_string();
                     self.collections.push(Collection {
+                        id,
                         name: "New Collection".to_string(),
                         requests: Vec::new(),
                     });
@@ -525,6 +595,10 @@ impl App {
             if let Some((header_key, value)) = headers.get_mut(self.selected_header_row) {
                 match field {
                     HeaderField::Key => match key.code {
+                        KeyCode::Esc => {
+                            self.input_mode = InputMode::Normal;
+                            self.editing_header_field = None;
+                        }
                         KeyCode::Backspace => {
                             header_key.pop();
                         }
@@ -600,6 +674,9 @@ impl App {
                     },
                 }
             }
+        } else {
+            // If no field is being edited, start editing the key of the selected row.
+            self.editing_header_field = Some(HeaderField::Key);
         }
     }
 

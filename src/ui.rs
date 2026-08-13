@@ -1,6 +1,7 @@
 use crate::app::{App, CollectionState, Focus, InputMode, RequestTab};
 use crate::request::HttpMethod;
 use ratatui::layout::Margin;
+use ratatui::style::Stylize;
 use ratatui::widgets::{Scrollbar, ScrollbarOrientation};
 use ratatui::{
     Frame,
@@ -137,15 +138,15 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
             .collect();
 
         let debug_text = format!(
-            "focus: {:?}\ntab: {:?}\nmode: {:?}\nmethod: {:?}\nactive_request - name: {:?}\nactive_request - url: {:?}\nactive_request - headers: {:?}\nactive_request - response: {:?}\nactive_request - body: {:?}\nselected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\ncollection_list_state: {:?}\nexpanded_collections: {:?}\ncollection_ui_state: {:?}\nrequest_list_state: {:?}\nbody_editor_lines: {:?}",
+            "focus: {:?}\ntab: {:?}\nmode: {:?}\n
+            active_request: {:?}\nresponse: {:?}\n
+            selected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\n
+            collection_list_state: {:?}\nexpanded_collections: {:?}\ncollection_ui_state: {:?}\nrequest_list_state: {:?}\n
+            body_editor_lines: {:?}",
             app.focus,
             app.active_tab,
             app.input_mode,
-            app.active_request.name,
-            app.active_request.method,
-            app.active_request.url,
-            app.active_request.headers,
-            app.active_request.body,
+            app.active_request,
             app.response,
             app.selected_header_row,
             app.editing_header_field.as_ref(),
@@ -169,10 +170,10 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
                 app.collections
                     .get(app.collection_list_state.selected().unwrap_or(0))
                     .and_then(|c| c.requests.get(i))
-                    .map(|r| r.name.clone())
+                    .map(|r| r.to_string())
                     .unwrap_or_default()
             )),
-            app.body_editor.lines().join("\n")
+            app.body_editor.lines().join("\n"),
         );
 
         let debug_area = Rect {
