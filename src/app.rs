@@ -1,7 +1,11 @@
-use crate::{event::AppEvent, http::send};
 use crate::{
-    local_store::StoreKey,
+    event::AppEvent,
+    http::send,
+    request::{AuthDraft, AuthKind},
+};
+use crate::{
     local_store::LocalStore,
+    local_store::StoreKey,
     request::{HttpMethod, Request, Response},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -95,6 +99,8 @@ pub struct App {
     pub expanded_collections: Vec<usize>,
     pub collection_ui_state: CollectionState,
     pub body_editor: TextArea<'static>,
+    pub auth_draft: AuthDraft,
+    pub auth_kind: AuthKind,
 }
 
 impl App {
@@ -128,6 +134,8 @@ impl App {
             expanded_collections: Vec::new(),
             collection_ui_state: CollectionState::default(),
             body_editor: TextArea::default(),
+            auth_draft: AuthDraft::default(),
+            auth_kind: AuthKind::None,
         }
     }
     fn load_collections(&mut self) {
@@ -155,7 +163,8 @@ impl App {
                 let collection = match collection {
                     Some(c) => c,
                     None => {
-                        self.error_message = Some("No active collection to save response".to_string());
+                        self.error_message =
+                            Some("No active collection to save response".to_string());
                         return;
                     }
                 };
@@ -259,7 +268,7 @@ impl App {
 
             KeyCode::Char('h') => match self.focus {
                 Focus::RequestBuilder => match self.active_tab {
-                    RequestTab::Url => {}
+                    RequestTab::Url => self.prev_tab(),
                     RequestTab::Headers => self.prev_tab(),
                     RequestTab::Body => self.prev_tab(),
                     RequestTab::Auth => self.prev_tab(),
@@ -332,6 +341,20 @@ impl App {
                         }
                         _ => {}
                     },
+                    RequestTab::Auth => match self.auth_kind {
+                        AuthKind::Bearer => {
+                            self.auth_kind = AuthKind::None;
+                        }
+                        AuthKind::Basic => {
+                            self.auth_kind = AuthKind::Bearer;
+                        }
+                        AuthKind::ApiKey => {
+                            self.auth_kind = AuthKind::Basic;
+                        }
+                        AuthKind::None => {
+                            self.auth_kind = AuthKind::ApiKey;
+                        }
+                    },
                     _ => {}
                 },
                 _ => {}
@@ -348,6 +371,20 @@ impl App {
                             self.headers_table_state.select_column(Some(0));
                         }
                         _ => {}
+                    },
+                    RequestTab::Auth => match self.auth_kind {
+                        AuthKind::Bearer => {
+                            self.auth_kind = AuthKind::Basic;
+                        }
+                        AuthKind::Basic => {
+                            self.auth_kind = AuthKind::ApiKey;
+                        }
+                        AuthKind::ApiKey => {
+                            self.auth_kind = AuthKind::None;
+                        }
+                        AuthKind::None => {
+                            self.auth_kind = AuthKind::Bearer;
+                        }
                     },
                     _ => {}
                 },
@@ -486,7 +523,7 @@ impl App {
                 }
                 RequestTab::Headers => self.handle_insert_header(key),
                 RequestTab::Body => self.handle_insert_body(key, event),
-                RequestTab::Auth => {}
+                RequestTab::Auth => self.handle_insert_auth(key),
             },
             Focus::Response => {}
             _ => {}
@@ -554,6 +591,34 @@ impl App {
                 }
                 _ => {}
             },
+        }
+    }
+
+    fn handle_insert_auth(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.input_mode = InputMode::Normal;
+                self.update_request();
+            }
+            KeyCode::Char(c) => match self.auth_kind {
+                AuthKind::Basic => self.auth_draft.basic_username.push(c),
+                AuthKind::Bearer => self.auth_draft.bearer_token.push(c),
+                AuthKind::ApiKey => self.auth_draft.api_key_value.push(c),
+                _ => {}
+            },
+            KeyCode::Backspace => match self.auth_kind {
+                AuthKind::Basic => {
+                    self.auth_draft.basic_username.pop();
+                }
+                AuthKind::Bearer => {
+                    self.auth_draft.bearer_token.pop();
+                }
+                AuthKind::ApiKey => {
+                    self.auth_draft.api_key_value.pop();
+                }
+                _ => {}
+            },
+            _ => {}
         }
     }
 

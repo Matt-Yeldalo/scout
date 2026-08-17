@@ -23,6 +23,66 @@ pub enum Auth {
     },
 }
 
+impl From<&AuthDraft> for Auth {
+    fn from(d: &AuthDraft) -> Self {
+        match d.kind {
+            AuthKind::None => Auth::None,
+            AuthKind::Bearer => Auth::Bearer(d.bearer_token.clone()),
+            AuthKind::Basic => Auth::Basic {
+                username: d.basic_username.clone(),
+                password: d.basic_password.clone(),
+            },
+            AuthKind::ApiKey => Auth::ApiKey {
+                header: d.api_key_header.clone(),
+                value: d.api_key_value.clone(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub enum AuthKind {
+    #[default]
+    None,
+    Bearer,
+    Basic,
+    ApiKey,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct AuthDraft {
+    pub kind: AuthKind,
+    pub bearer_token: String,
+    pub basic_username: String,
+    pub basic_password: String,
+    pub api_key_header: String,
+    pub api_key_value: String,
+}
+
+impl From<&Auth> for AuthDraft {
+    fn from(a: &Auth) -> Self {
+        let mut d = AuthDraft::default();
+        match a {
+            Auth::None => {}
+            Auth::Bearer(t) => {
+                d.kind = AuthKind::Bearer;
+                d.bearer_token = t.clone();
+            }
+            Auth::Basic { username, password } => {
+                d.kind = AuthKind::Basic;
+                d.basic_username = username.clone();
+                d.basic_password = password.clone();
+            }
+            Auth::ApiKey { header, value } => {
+                d.kind = AuthKind::ApiKey;
+                d.api_key_header = header.clone();
+                d.api_key_value = value.clone();
+            }
+        }
+        d
+    }
+}
+
 // TODO: add ability to lock to prevent save_all from overwriting
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Request {

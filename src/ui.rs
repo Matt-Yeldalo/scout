@@ -1,5 +1,5 @@
 use crate::app::{App, CollectionState, Focus, InputMode, RequestTab};
-use crate::request::HttpMethod;
+use crate::request::{AuthKind, HttpMethod};
 use crate::toolbar::toolbar_hints;
 use ratatui::layout::Margin;
 use ratatui::style::Stylize;
@@ -31,7 +31,7 @@ pub fn render(frame: &mut Frame, app: &App) {
     // Top 40% = request builder, bottom 60% = response.
     // Responses tend to be long so they get the larger share.
     let [builder_area, response_area] =
-        Layout::vertical([Constraint::Percentage(40), Constraint::Percentage(60)])
+        Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)])
             .areas(right_area);
 
     let mut response_scrollbar = app.response_scrollbar.clone();
@@ -309,7 +309,8 @@ fn render_request_builder(frame: &mut Frame, app: &App, area: Rect) {
         RequestTab::Url => render_url_tab(frame, app, content_area),
         RequestTab::Headers => render_headers_tab(frame, app, content_area),
         RequestTab::Body => render_body_tab(frame, app, content_area),
-        RequestTab::Auth => render_placeholder(frame, "Auth — issue #8", content_area),
+        RequestTab::Auth => render_auth_tab(frame, app, content_area),
+        // RequestTab::Auth => render_placeholder(frame, "Auth — issue #8", content_area),
     }
 }
 
@@ -381,21 +382,41 @@ fn render_headers_tab(frame: &mut Frame, app: &App, area: Rect) {
     );
 }
 
+fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
+    let auth_draft = app.auth_draft.clone();
+    let auth_text = match app.auth_kind {
+        AuthKind::Bearer => auth_draft.bearer_token,
+        AuthKind::Basic => format!(
+            "Username: {}\nPassword: {}",
+            auth_draft.basic_username, auth_draft.basic_password
+        ),
+        AuthKind::ApiKey => format!(
+            "Header: {}\nValue: {}",
+            auth_draft.api_key_header, auth_draft.api_key_value
+        ),
+        AuthKind::None => "(no authentication)".to_string(),
+    };
+
+    frame.render_widget(
+        Paragraph::new(auth_text)
+            .style(Style::default().fg(Color::White))
+            .block(Block::default().borders(Borders::ALL).title("Authentication")),
+        area,
+    );
+}
+
 fn render_body_tab(frame: &mut Frame, app: &App, area: Rect) {
-    let request_body = app.active_request.body.as_deref().unwrap_or_default();
-    if request_body.is_empty() {
-        render_placeholder(frame, "(no body)", area);
+    if app.input_mode == InputMode::Insert {
+        frame.render_widget(&app.body_editor, area);
         return;
     }
 
-    // let textarea = app.body_editor.clone();
-
-    frame.render_widget(&app.body_editor, area);
-
-    // frame.render_widget(
-    //     Paragraph::new(request_body).style(Style::default().fg(Color::White)),
-    //     area,
-    // );
+    let body = app.active_request.body.as_deref().unwrap_or_default();
+    if body.is_empty() {
+        render_placeholder(frame, "(no body — press i to edit)", area);
+    } else {
+        frame.render_widget(Paragraph::new(body).style(Style::default().fg(Color::White)), area);
+    }
 }
 
 fn render_placeholder(frame: &mut Frame, label: &str, area: Rect) {

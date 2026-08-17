@@ -206,12 +206,11 @@ _Touches: `app.rs`, `ui.rs`, `event.rs`_
 Editable key/value list for request headers. Navigate rows with `j`/`k`, add a new row
 with `a`, delete selected row with `d`, edit values in Insert mode.
 _Touches: `app.rs`, `ui.rs`, `event.rs`_
--->
-
 ### #7 — Body tab
 
-A scrollable multiline text area for the POST body. Basic editing in Insert mode.  
+A scrollable multiline text area for the POST body. Basic editing in Insert mode.
 _Touches: `app.rs`, `ui.rs`, `event.rs`_
+-->
 
 ### #8 — Auth tab
 

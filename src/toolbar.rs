@@ -1,5 +1,5 @@
 use crate::app::{App, CollectionState, Focus, InputMode};
-
+static GAP: &str = "  ";
 pub fn toolbar_hints(app: &App) -> String {
     let parts = match app.input_mode {
         InputMode::Normal => {
@@ -60,10 +60,9 @@ pub fn toolbar_hints(app: &App) -> String {
 }
 
 fn build_toolbar(parts: &Vec<&str>) -> String {
-    let spacing = " ".repeat(2);
     let mut toolbar = String::new();
     for part in parts {
-        toolbar.push_str(&spacing);
+        toolbar.push_str(GAP);
         toolbar.push_str(&part);
     }
     toolbar
