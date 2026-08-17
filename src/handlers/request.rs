@@ -1,5 +1,5 @@
 use crate::{
-    app::{App, HeaderField, InputMode, RequestTab},
+    app::{App, AuthField, HeaderField, InputMode, RequestTab},
     request::{AuthKind, HttpMethod},
 };
 use crossterm::event::{KeyCode, KeyEvent};
@@ -29,7 +29,6 @@ impl App {
             KeyCode::Char('i') => match self.active_tab {
                 RequestTab::Url => {}
                 RequestTab::Headers => {
-                    // self.editing_header_field = Some(HeaderField::Key);
                     match self.headers_table_state.selected_column() {
                         Some(0) => self.editing_header_field = Some(HeaderField::Key),
                         Some(1) => self.editing_header_field = Some(HeaderField::Value),
@@ -128,12 +127,66 @@ impl App {
                     self.headers_table_state.select_previous();
                 }
             }
+            RequestTab::Auth => match self.auth_kind {
+                AuthKind::Basic => match self.editing_auth_field {
+                    Some(AuthField::BasicUsername) => {
+                        self.editing_auth_field = Some(AuthField::BasicPassword);
+                    }
+                    Some(AuthField::BasicPassword) => {
+                        self.editing_auth_field = Some(AuthField::BasicUsername);
+                    }
+                    None => {
+                        self.editing_auth_field = Some(AuthField::BasicUsername);
+                    }
+                    _ => {}
+                },
+                AuthKind::ApiKey => match self.editing_auth_field {
+                    Some(AuthField::ApiKeyHeader) => {
+                        self.editing_auth_field = Some(AuthField::ApiKeyValue);
+                    }
+                    Some(AuthField::ApiKeyValue) => {
+                        self.editing_auth_field = Some(AuthField::ApiKeyHeader);
+                    }
+                    None => {
+                        self.editing_auth_field = Some(AuthField::ApiKeyHeader);
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
             _ => {}
         }
     }
 
     fn handle_normal_down(&mut self, key: KeyEvent) {
         match self.active_tab {
+            RequestTab::Auth => match self.auth_kind {
+                AuthKind::Basic => match self.editing_auth_field {
+                    Some(AuthField::BasicUsername) => {
+                        self.editing_auth_field = Some(AuthField::BasicPassword);
+                    }
+                    Some(AuthField::BasicPassword) => {
+                        self.editing_auth_field = Some(AuthField::BasicUsername);
+                    }
+                    None => {
+                        self.editing_auth_field = Some(AuthField::BasicUsername);
+                    }
+                    _ => {}
+                },
+                AuthKind::ApiKey => match self.editing_auth_field {
+                    Some(AuthField::ApiKeyHeader) => {
+                        self.editing_auth_field = Some(AuthField::ApiKeyValue);
+                    }
+                    Some(AuthField::ApiKeyValue) => {
+                        self.editing_auth_field = Some(AuthField::ApiKeyHeader);
+                    }
+                    None => {
+                        self.editing_auth_field = Some(AuthField::ApiKeyHeader);
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
             RequestTab::Headers => {
                 if self.selected_header_row < self.active_request.headers.len() - 1 {
                     self.selected_header_row += 1;

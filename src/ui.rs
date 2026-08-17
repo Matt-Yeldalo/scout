@@ -16,27 +16,26 @@ use ratatui::{
 /// This function must never mutate `app` — it is a pure read.
 pub fn render(frame: &mut Frame, app: &App) {
     // --- Top-level split ---
-    // Carve a single status-bar line off the bottom of the terminal.
     // `Length(1)` takes exactly 1 row. `Min(0)` takes all remaining rows.
     let [main_area, status_bar] =
         Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(frame.area());
 
     // --- Horizontal split ---
-    // Left quarter = collections sidebar, right three-quarters = working area.
     let [sidebar_area, right_area] =
-        Layout::horizontal([Constraint::Percentage(25), Constraint::Percentage(75)])
-            .areas(main_area);
+        // Layout::horizontal([Constraint::Percentage(25), Constraint::Percentage(75)])
+        //     .areas(main_area);
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(main_area);
 
-    // --- Vertical split inside the right panel ---
-    // Top 40% = request builder, bottom 60% = response.
-    // Responses tend to be long so they get the larger share.
+    // --- Top and bottm of right panel ---
     let [builder_area, response_area] =
-        Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)])
-            .areas(right_area);
+        // Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)])
+        //     .areas(right_area);
+        Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)]).areas(right_area);
 
     let mut response_scrollbar = app.response_scrollbar.clone();
 
     render_collections(frame, app, sidebar_area);
+    render_debug_info(frame, app, sidebar_area);
 
     render_request_builder(frame, app, builder_area);
 
@@ -129,67 +128,6 @@ fn render_collections(frame: &mut Frame, app: &App, area: Rect) {
             render_collection_request_list(frame, app, area, focused)
         }
         CollectionState::CollectionList => render_collection_list(frame, app, area, focused),
-    }
-
-    if app.debug {
-        let expanded_collections: Vec<String> = app
-            .expanded_collections
-            .iter()
-            .map(|name| name.to_string())
-            .collect();
-
-        let debug_text = format!(
-            "focus: {:?}\ntab: {:?}\nmode: {:?}\n
-            active_request: {:?}\nresponse: {:?}\n
-            selected_header_row: {:?}\nediting_header_field: {:?}\nheaders_table_selected: {:?}\n
-            collection_list_state: {:?}\nexpanded_collections: {:?}\ncollection_ui_state: {:?}\nrequest_list_state: {:?}\n
-            body_editor_lines: {:?}",
-            app.focus,
-            app.active_tab,
-            app.input_mode,
-            app.active_request,
-            app.response,
-            app.selected_header_row,
-            app.editing_header_field.as_ref(),
-            app.headers_table_state.selected(),
-            app.collection_list_state
-                .selected()
-                // .map(|i| app.collections.get(i).cloned()),
-                .map(|i| format!(
-                    "\n{}: {}",
-                    i,
-                    app.collections
-                        .get(i)
-                        .map(|c| c.name.clone())
-                        .unwrap_or_default()
-                )),
-            expanded_collections,
-            app.collection_ui_state,
-            app.request_list_state.selected().map(|i| format!(
-                "\n{}: {}",
-                i,
-                app.collections
-                    .get(app.collection_list_state.selected().unwrap_or(0))
-                    .and_then(|c| c.requests.get(i))
-                    .map(|r| r.to_string())
-                    .unwrap_or_default()
-            )),
-            app.body_editor.lines().join("\n"),
-        );
-
-        let debug_area = Rect {
-            x: area.x,
-            y: area.y + area.height - 20,
-            width: area.width,
-            height: 20,
-        };
-
-        frame.render_widget(
-            Paragraph::new(debug_text)
-                .style(Style::default().fg(Color::LightYellow))
-                .block(Block::default().title("Debug").borders(Borders::ALL)),
-            debug_area,
-        );
     }
 }
 
@@ -400,7 +338,11 @@ fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(
         Paragraph::new(auth_text)
             .style(Style::default().fg(Color::White))
-            .block(Block::default().borders(Borders::ALL).title("Authentication")),
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Authentication"),
+            ),
         area,
     );
 }
@@ -415,7 +357,10 @@ fn render_body_tab(frame: &mut Frame, app: &App, area: Rect) {
     if body.is_empty() {
         render_placeholder(frame, "(no body — press i to edit)", area);
     } else {
-        frame.render_widget(Paragraph::new(body).style(Style::default().fg(Color::White)), area);
+        frame.render_widget(
+            Paragraph::new(body).style(Style::default().fg(Color::White)),
+            area,
+        );
     }
 }
 
@@ -567,4 +512,48 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let line = Line::from(vec![Span::styled(mode_label, mode_style), Span::raw(hints)]);
 
     frame.render_widget(Paragraph::new(line), area);
+}
+
+fn render_debug_info(frame: &mut Frame, app: &App, area: Rect) {
+    if !app.debug {
+        return;
+    }
+
+    let expanded_collections: Vec<String> = app
+        .expanded_collections
+        .iter()
+        .map(|name| name.to_string())
+        .collect();
+
+    let debug_text = format!(
+        "focus: {:?}\ttab: {:?}\tmode: {:?}\n
+            response: {:?}\n
+            selected_header_row: {:?}\tediting_header_field: {:?}\theaders_table_selected: {:?}\n
+            expanded_collections: {:?}\tcollection_ui_state: {:?}\n
+            body_editor_lines: {:?}",
+        app.focus,
+        app.active_tab,
+        app.input_mode,
+        app.response,
+        app.selected_header_row,
+        app.editing_header_field.as_ref(),
+        app.headers_table_state.selected(),
+        expanded_collections,
+        app.collection_ui_state,
+        app.body_editor.lines().join("\n"),
+    );
+
+    let debug_area = Rect {
+        x: area.x,
+        y: area.y + area.height - 20,
+        width: area.width,
+        height: 20,
+    };
+
+    frame.render_widget(
+        Paragraph::new(debug_text)
+            .style(Style::default().fg(Color::LightYellow))
+            .block(Block::default().title("Debug").borders(Borders::ALL)),
+        debug_area,
+    );
 }
