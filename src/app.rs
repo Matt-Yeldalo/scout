@@ -66,6 +66,15 @@ pub enum CollectionState {
     RequestList(usize), // index of the selected collection
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum AuthField {
+    BearerToken,
+    BasicUsername,
+    BasicPassword,
+    ApiKeyHeader,
+    ApiKeyValue,
+}
+
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum HeaderField {
     #[default]
@@ -101,6 +110,7 @@ pub struct App {
     pub body_editor: TextArea<'static>,
     pub auth_draft: AuthDraft,
     pub auth_kind: AuthKind,
+    pub editing_auth_field: Option<AuthField>,
 }
 
 impl App {
@@ -136,6 +146,7 @@ impl App {
             body_editor: TextArea::default(),
             auth_draft: AuthDraft::default(),
             auth_kind: AuthKind::None,
+            editing_auth_field: None,
         }
     }
     fn load_collections(&mut self) {
