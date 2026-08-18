@@ -113,16 +113,24 @@ impl App {
         headers_table_state: TableState,
     ) -> Self {
         let local_store = LocalStore::new();
+        let collections = local_store.load_all().unwrap_or_else(|_| Vec::new());
+        let mut collection_list_state = ListState::default();
+        if collections.is_empty() {
+            collection_list_state.select(None);
+        } else {
+            collection_list_state.select(Some(0));
+        }
         Self {
             local_store: local_store.clone(),
             sender,
             headers_table_state,
+            collections,
+            collection_list_state,
             debug: true,
             should_quit: false,
             input_mode: InputMode::Normal,
             focus: Focus::Collections,
             active_tab: RequestTab::Url,
-            collections: local_store.load_all().unwrap_or_else(|_| Vec::new()),
             selected_request: None,
             active_request: Request::new(),
             response: None,
@@ -132,7 +140,6 @@ impl App {
             editing_header_field: None,
             response_scrollbar: ScrollbarState::default(),
             active_collection: None,
-            collection_list_state: ListState::default(),
             request_list_state: ListState::default(),
             expanded_collections: Vec::new(),
             collection_ui_state: CollectionState::default(),

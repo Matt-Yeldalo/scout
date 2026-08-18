@@ -519,18 +519,12 @@ fn render_debug_info(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    let expanded_collections: Vec<String> = app
-        .expanded_collections
-        .iter()
-        .map(|name| name.to_string())
-        .collect();
-
     let debug_text = format!(
-        "focus: {:?}\ttab: {:?}\tmode: {:?}\n
-            response: {:?}\n
-            selected_header_row: {:?}\tediting_header_field: {:?}\theaders_table_selected: {:?}\n
-            expanded_collections: {:?}\tcollection_ui_state: {:?}\n
-            body_editor_lines: {:?}",
+        // "focus: {:?}\ttab: {:?}\tmode: {:?}\n
+        //  response: {:?}\n
+        //  selected_header_row: {:?}\tediting_header_field: {:?}\theaders_table_selected: {:?}\n
+        //  collection_ui_state: {:?}",
+        "focus: {:?}\ttab: {:?}\tmode: {:?}\nresponse: {:?}\nselected_header_row: {:?}\tediting_header_field: {:?}\theaders_table_selected: {:?}\ncollection_ui_state: {:?}",
         app.focus,
         app.active_tab,
         app.input_mode,
@@ -538,9 +532,7 @@ fn render_debug_info(frame: &mut Frame, app: &App, area: Rect) {
         app.selected_header_row,
         app.editing_header_field.as_ref(),
         app.headers_table_state.selected(),
-        expanded_collections,
         app.collection_ui_state,
-        app.body_editor.lines().join("\n"),
     );
 
     let debug_area = Rect {
