@@ -76,20 +76,26 @@ impl LocalStore {
         }
     }
 
-    pub fn update_responses(&self, key: StoreKey, response: &Response) {
-        if !self.validate_response_key(&key) {
-            panic!(
-                "Invalid key for collection {} and request {}",
-                key.collection_id, key.request_id
-            );
+    pub fn update_responses(&self, key: StoreKey, response: &Response) -> anyhow::Result<()> {
+        // if !self.validate_response_key(&key) {
+        //     panic!(
+        //         "Invalid key for collection {} and request {}",
+        //         key.collection_id, key.request_id
+        //     );
+        // }
+        if let Err(e) = self.validate_response_key(&key) {
+            return Err(e);
         }
 
-        if !self.validate_response_file(&key) {
-            panic!(
-                "Invalid response file for collection {} and request {}",
-                key.collection_id, key.request_id
-            );
+        if let Err(e) = self.validate_response_file(&key) {
+            return Err(e);
         }
+        // if !self.validate_response_file(&key) {
+        //     panic!(
+        //         "Invalid response file for collection {} and request {}",
+        //         key.collection_id, key.request_id
+        //     );
+        // }
 
         let file_path = self.data_path.join(key.to_response_path());
         // append to array then write back to file
@@ -103,6 +109,7 @@ impl LocalStore {
         responses.push(response.clone());
         let json_data = serde_json::to_string(&responses).unwrap();
         std::fs::write(file_path, json_data).unwrap();
+        anyhow::Ok(())
         // std::fs::write(file_path, json_data).unwrap();
     }
 
@@ -160,9 +167,11 @@ impl LocalStore {
             if path.is_dir() {
                 let collection_data_file = path.join("collection.json");
                 if collection_data_file.exists() {
-                    let file = std::fs::File::open(&collection_data_file).map_err(|e| e.to_string())?;
+                    let file =
+                        std::fs::File::open(&collection_data_file).map_err(|e| e.to_string())?;
                     let reader = std::io::BufReader::new(file);
-                    let collection: Collection = serde_json::from_reader(reader).map_err(|e| e.to_string())?;
+                    let collection: Collection =
+                        serde_json::from_reader(reader).map_err(|e| e.to_string())?;
                     collections.push(collection);
                 }
             }
@@ -171,88 +180,125 @@ impl LocalStore {
         Ok(collections)
     }
 
-    fn validate_response_file(&self, key: &StoreKey) -> bool {
+    // fn validate_response_file(&self, key: &StoreKey) -> bool {
+    //     let response_file_path = self.data_path.join(key.to_response_path());
+    //     if !response_file_path.exists() {
+    //         std::fs::File::create(&response_file_path).unwrap_or_else(|e| {
+    //             return ();
+    //             // panic!(
+    //             //     "Failed to create responses.json file for collection {} and request {}: {}",
+    //             //     key.collection_id, key.request_id, e
+    //             // )
+    //         });
+    //     }
+    //
+    //     let response_file = std::fs::File::open(&response_file_path).unwrap_or_else(|e| {
+    //         return ();
+    //         // panic!(
+    //         //     "Failed to open responses.json file for collection {} and request {}: {}",
+    //         //     key.collection_id, key.request_id, e
+    //         // )
+    //     });
+    //     let reader = std::io::BufReader::new(response_file);
+    //     if let Err(e) = serde_json::from_reader::<_, serde_json::Value>(reader) {
+    //         std::fs::write(&response_file_path, "[]").unwrap_or_else(|e| {
+    //             return ();
+    //             // panic!(
+    //             //     "Failed to write empty array to responses.json file for collection {} and request {}: {}",
+    //             //     key.collection_id, key.request_id, e
+    //             // )
+    //         });
+    //     }
+    //     let response_json = serde_json::from_reader::<_, serde_json::Value>(
+    //         std::fs::File::open(&response_file_path).unwrap(),
+    //     )
+    //     .unwrap_or_else(|e| {
+    //         return ();
+    //         // panic!(
+    //         //     "Failed to read responses.json file for collection {} and request {}: {}",
+    //         //     key.collection_id, key.request_id, e
+    //         // )
+    //     });
+    //
+    //     // if json is not array, wipe and insert empty array
+    //     if !response_json.is_array() {
+    //         let response_file_path = self.data_path.join(key.to_response_path());
+    //         std::fs::write(response_file_path, "[]").unwrap_or_else(|e| {
+    //             return ();
+    //             // panic!(
+    //             //     "Failed to write empty array to responses.json file for collection {} and request {}: {}",
+    //             //     key.collection_id, key.request_id, e
+    //             // )
+    //         });
+    //     }
+    //
+    //     true
+    // }
+
+    fn validate_response_file(&self, key: &StoreKey) -> anyhow::Result<()> {
         let response_file_path = self.data_path.join(key.to_response_path());
+
         if !response_file_path.exists() {
-            std::fs::File::create(&response_file_path).unwrap_or_else(|e| {
-                panic!(
-                    "Failed to create responses.json file for collection {} and request {}: {}",
-                    key.collection_id, key.request_id, e
-                )
-            });
+            std::fs::File::create(&response_file_path)?;
         }
 
-        let response_file = std::fs::File::open(&response_file_path).unwrap_or_else(|e| {
-            panic!(
-                "Failed to open responses.json file for collection {} and request {}: {}",
-                key.collection_id, key.request_id, e
-            )
-        });
-        let reader = std::io::BufReader::new(response_file);
-        if let Err(e) = serde_json::from_reader::<_, serde_json::Value>(reader) {
-            std::fs::write(&response_file_path, "[]").unwrap_or_else(|e| {
-                panic!(
-                    "Failed to write empty array to responses.json file for collection {} and request {}: {}",
-                    key.collection_id, key.request_id, e
-                )
-            });
+        let reader = std::io::BufReader::new(std::fs::File::open(&response_file_path)?);
+        if serde_json::from_reader::<_, serde_json::Value>(reader).is_err() {
+            std::fs::write(&response_file_path, "[]")?;
         }
+
         let response_json = serde_json::from_reader::<_, serde_json::Value>(
-            std::fs::File::open(&response_file_path).unwrap(),
-        )
-        .unwrap_or_else(|e| {
-            panic!(
-                "Failed to read responses.json file for collection {} and request {}: {}",
-                key.collection_id, key.request_id, e
-            )
-        });
+            std::io::BufReader::new(std::fs::File::open(&response_file_path)?),
+        )?;
 
-        // if json is not array, wipe and insert empty array
         if !response_json.is_array() {
-            let response_file_path = self.data_path.join(key.to_response_path());
-            std::fs::write(response_file_path, "[]").unwrap_or_else(|e| {
-                panic!(
-                    "Failed to write empty array to responses.json file for collection {} and request {}: {}",
-                    key.collection_id, key.request_id, e
-                )
-            });
+            std::fs::write(&response_file_path, "[]")?;
         }
 
-        true
+        Ok(())
     }
 
-    fn validate_response_key(&self, key: &StoreKey) -> bool {
+    fn validate_response_key(&self, key: &StoreKey) -> anyhow::Result<()> {
         if !self.data_path.exists() {
             std::fs::create_dir_all(&self.data_path).unwrap();
         }
 
         let collection_path = self.data_path.join(&key.collection_id);
         if !collection_path.exists() {
-            std::fs::create_dir_all(collection_path).unwrap_or_else(|e| {
-                panic!(
-                    "Failed to create directory for collection {}: {}",
-                    key.collection_id, e
-                )
-            });
+            if let Err(e) = std::fs::create_dir_all(&collection_path) {
+                return Err(anyhow::anyhow!(e));
+            }
+            // std::fs::create_dir_all(collection_path).unwrap_or_else(|e| {
+            // panic!(
+            //     "Failed to create directory for collection {}: {}",
+            //     key.collection_id, e
+            // )
+            // });
         }
 
         let file_path = self.data_path.join(key.to_request_path());
         if !file_path.exists() {
-            std::fs::File::create(file_path).unwrap_or_else(|e| {
-                panic!(
-                    "Failed to create file for collection {} and request {}: {}",
-                    key.collection_id, key.request_id, e
-                )
-            });
+            // std::fs::File::create(file_path).unwrap_or_else(|e| {
+            //     panic!(
+            //         "Failed to create file for collection {} and request {}: {}",
+            //         key.collection_id, key.request_id, e
+            //     )
+            // });
+            if let Err(e) = std::fs::create_dir_all(&file_path) {
+                return Err(anyhow::anyhow!(e));
+            }
         }
 
         let response_file_path = self.data_path.join("responses.json");
         if !response_file_path.exists() {
-            std::fs::File::create(response_file_path)
-                .unwrap_or_else(|e| panic!("Failed to create responses.json file: {}", e));
+            // std::fs::File::create(response_file_path)
+            //     .unwrap_or_else(|e| panic!("Failed to create responses.json file: {}", e));
+            if let Err(e) = std::fs::File::create(&response_file_path) {
+                return Err(anyhow::anyhow!(e));
+            }
         }
 
-        true
+        Ok(())
     }
 
     fn validate_key(&self, key: &StoreKey, skip_request: bool) -> bool {

@@ -334,6 +334,12 @@ fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
         ),
         AuthKind::None => "(no authentication)".to_string(),
     };
+    let title = match app.auth_kind {
+        AuthKind::Bearer => "Bearer Token",
+        AuthKind::Basic => "Basic Auth",
+        AuthKind::ApiKey => "API Key",
+        AuthKind::None => "No Auth",
+    };
 
     frame.render_widget(
         Paragraph::new(auth_text)
@@ -341,7 +347,7 @@ fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title("Authentication"),
+                    .title(title),
             ),
         area,
     );
@@ -524,7 +530,7 @@ fn render_debug_info(frame: &mut Frame, app: &App, area: Rect) {
         //  response: {:?}\n
         //  selected_header_row: {:?}\tediting_header_field: {:?}\theaders_table_selected: {:?}\n
         //  collection_ui_state: {:?}",
-        "focus: {:?}\ttab: {:?}\tmode: {:?}\nresponse: {:?}\nselected_header_row: {:?}\tediting_header_field: {:?}\theaders_table_selected: {:?}\ncollection_ui_state: {:?}",
+        "focus: {:?} | tab: {:?} | mode: {:?}\nresponse: {:?}\nselected_header_row: {:?} | editing_header_field: {:?} | headers_table_selected: {:?}\ncollection_ui_state: {:?}\nauth_kind: {:?}\nauth_draft: {:?}\nediting_auth_field: {:?}",
         app.focus,
         app.active_tab,
         app.input_mode,
@@ -533,6 +539,9 @@ fn render_debug_info(frame: &mut Frame, app: &App, area: Rect) {
         app.editing_header_field.as_ref(),
         app.headers_table_state.selected(),
         app.collection_ui_state,
+        app.auth_kind,
+        app.auth_draft,
+        app.editing_auth_field.as_ref()
     );
 
     let debug_area = Rect {

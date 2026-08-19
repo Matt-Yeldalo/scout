@@ -1,4 +1,4 @@
-use crate::app::{App, CollectionState, Focus, InputMode};
+use crate::app::{App, CollectionState, Focus, InputMode, RequestTab};
 static GAP: &str = "  ";
 pub fn toolbar_hints(app: &App) -> String {
     let parts = match app.input_mode {
@@ -29,17 +29,41 @@ pub fn toolbar_hints(app: &App) -> String {
                         ]
                     }
                 },
-                Focus::RequestBuilder => {
-                    // "  [tab] cycle focus   [h/l] switch tab   [i] insert   [m] method   [s] send   [q] quit".to_string()
-                    vec![
-                        "[tab] cycle focus",
-                        "[h/l] switch tab",
-                        "[i] insert",
-                        "[m] method",
-                        "[s] send",
-                        "[q] quit",
-                    ]
-                }
+                // "  [tab] cycle focus   [h/l] switch tab   [i] insert   [m] method   [s] send   [q] quit".to_string()
+                // Focus::RequestBuilder => {
+                //     vec![
+                //         "[tab] cycle focus",
+                //         "[h/l] switch tab",
+                //         "[i] insert",
+                //         "[m] method",
+                //         "[s] send",
+                //         "[q] quit",
+                //     ]
+                // }
+                Focus::RequestBuilder => match app.active_tab {
+                    RequestTab::Auth => {
+                        vec![
+                            "[tab] cycle focus",
+                            "[h/l] switch tab",
+                            "[←/→] switch auth type",
+                            "[↓/↑] switch auth field",
+                            "[i] insert",
+                            "[m] method",
+                            "[s] send",
+                            "[q] quit",
+                        ]
+                    }
+                    _ => {
+                        vec![
+                            "[tab] cycle focus",
+                            "[h/l] switch tab",
+                            "[i] insert",
+                            "[m] method",
+                            "[s] send",
+                            "[q] quit",
+                        ]
+                    }
+                },
                 Focus::Response => {
                     // "  [tab] cycle focus   [h/l] switch tab   [s] send   [q] quit".to_string()
                     vec![

@@ -189,7 +189,10 @@ impl App {
 
                 // maybe consider making key private again and letting local state handle conversion
                 let key = StoreKey::from(&collection, &self.active_request);
-                self.local_store.update_responses(key, &response);
+                let result = self.local_store.update_responses(key, &response);
+                if let Err(e) = result {
+                    self.error_message = Some(format!("Failed to save response: {}", e));
+                }
             }
         }
     }

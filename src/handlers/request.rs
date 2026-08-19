@@ -1,6 +1,6 @@
 use crate::{
     app::{App, AuthField, HeaderField, InputMode, RequestTab},
-    request::{AuthKind, HttpMethod},
+    request::{Auth, AuthDraft, AuthKind, HttpMethod},
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use tui_textarea::{CursorMove, TextArea};
@@ -27,20 +27,36 @@ impl App {
                 };
             }
             KeyCode::Char('i') => match self.active_tab {
-                RequestTab::Url => {}
-                RequestTab::Headers => {
-                    match self.headers_table_state.selected_column() {
-                        Some(0) => self.editing_header_field = Some(HeaderField::Key),
-                        Some(1) => self.editing_header_field = Some(HeaderField::Value),
-                        _ => self.editing_header_field = Some(HeaderField::Key),
-                    }
+                RequestTab::Url => {
+                    self.input_mode = InputMode::Insert;
                 }
+                RequestTab::Headers => match self.headers_table_state.selected_column() {
+                    Some(0) => self.editing_header_field = Some(HeaderField::Key),
+                    Some(1) => self.editing_header_field = Some(HeaderField::Value),
+                    _ => self.editing_header_field = Some(HeaderField::Key),
+                },
                 RequestTab::Body => {
                     if let Some(body) = &self.active_request.body {
                         self.body_editor = TextArea::from(body.lines());
                     }
                 }
-                RequestTab::Auth => {}
+                RequestTab::Auth => {
+                    self.input_mode = InputMode::Insert;
+                    if self.editing_auth_field.is_none() {
+                        match self.auth_kind {
+                            AuthKind::Basic => {
+                                self.editing_auth_field = Some(AuthField::BasicUsername);
+                            }
+                            AuthKind::Bearer => {
+                                self.editing_auth_field = Some(AuthField::BearerToken);
+                            }
+                            AuthKind::ApiKey => {
+                                self.editing_auth_field = Some(AuthField::ApiKeyHeader);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             },
             KeyCode::Char('a') => match self.active_tab {
                 RequestTab::Headers => {
@@ -72,18 +88,10 @@ impl App {
                 _ => {}
             },
             RequestTab::Auth => match self.auth_kind {
-                AuthKind::Bearer => {
-                    self.auth_kind = AuthKind::Basic;
-                }
-                AuthKind::Basic => {
-                    self.auth_kind = AuthKind::ApiKey;
-                }
-                AuthKind::ApiKey => {
-                    self.auth_kind = AuthKind::None;
-                }
-                AuthKind::None => {
-                    self.auth_kind = AuthKind::Bearer;
-                }
+                AuthKind::Bearer => self.update_auth_kind(AuthKind::Basic),
+                AuthKind::Basic => self.update_auth_kind(AuthKind::ApiKey),
+                AuthKind::ApiKey => self.update_auth_kind(AuthKind::None),
+                AuthKind::None => self.update_auth_kind(AuthKind::Bearer),
             },
             _ => {}
         }
@@ -102,18 +110,10 @@ impl App {
                 _ => {}
             },
             RequestTab::Auth => match self.auth_kind {
-                AuthKind::Bearer => {
-                    self.auth_kind = AuthKind::None;
-                }
-                AuthKind::Basic => {
-                    self.auth_kind = AuthKind::Bearer;
-                }
-                AuthKind::ApiKey => {
-                    self.auth_kind = AuthKind::Basic;
-                }
-                AuthKind::None => {
-                    self.auth_kind = AuthKind::ApiKey;
-                }
+                AuthKind::Bearer => self.update_auth_kind(AuthKind::None),
+                AuthKind::Basic => self.update_auth_kind(AuthKind::Bearer),
+                AuthKind::ApiKey => self.update_auth_kind(AuthKind::Basic),
+                AuthKind::None => self.update_auth_kind(AuthKind::ApiKey),
             },
             _ => {}
         }
@@ -228,11 +228,23 @@ impl App {
                 self.input_mode = InputMode::Normal;
                 self.update_request();
             }
-            KeyCode::Char(c) => match self.auth_kind {
-                AuthKind::Basic => self.auth_draft.basic_username.push(c),
-                AuthKind::Bearer => self.auth_draft.bearer_token.push(c),
-                AuthKind::ApiKey => self.auth_draft.api_key_value.push(c),
-                _ => {}
+            KeyCode::Char(c) => match self.editing_auth_field {
+                Some(AuthField::BasicUsername) => {
+                    self.auth_draft.basic_username.push(c);
+                }
+                Some(AuthField::BasicPassword) => {
+                    self.auth_draft.basic_password.push(c);
+                }
+                Some(AuthField::BearerToken) => {
+                    self.auth_draft.bearer_token.push(c);
+                }
+                Some(AuthField::ApiKeyHeader) => {
+                    self.auth_draft.api_key_header.push(c);
+                }
+                Some(AuthField::ApiKeyValue) => {
+                    self.auth_draft.api_key_value.push(c);
+                }
+                None => {}
             },
             KeyCode::Backspace => match self.auth_kind {
                 AuthKind::Basic => {
@@ -374,15 +386,30 @@ impl App {
         }
     }
 
+    fn update_auth_kind(&mut self, auth_kind: AuthKind) {
+        self.auth_kind = auth_kind;
+        self.sync_auth_draft();
+    }
+
+    fn sync_auth_draft(&mut self) {
+        self.auth_draft.kind = self.auth_kind.clone();
+    }
+
     pub fn update_request(&mut self) {
-        if let Some(selected_collection) = self.collection_list_state.selected() {
-            if let Some(selected_request) = self.request_list_state.selected() {
-                if let Some(collection) = self.collections.get_mut(selected_collection) {
-                    if let Some(request) = collection.requests.get_mut(selected_request) {
-                        *request = self.active_request.clone();
-                    }
-                }
-            }
-        }
+        let Some(collection_index) = self.collection_list_state.selected() else {
+            return;
+        };
+        let Some(request_index) = self.request_list_state.selected() else {
+            return;
+        };
+        let Some(collection) = self.collections.get_mut(collection_index) else {
+            return;
+        };
+        let Some(request) = collection.requests.get_mut(request_index) else {
+            return;
+        };
+
+        self.active_request.auth = Auth::from(&self.auth_draft);
+        *request = self.active_request.clone();
     }
 }

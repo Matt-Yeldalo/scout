@@ -7,6 +7,7 @@ impl App {
         match key.code {
             KeyCode::Enter => self.handle_normal_enter(),
             KeyCode::Char('s') => {
+                self.update_request();
                 self.local_store
                     .save_all(self.collections.clone())
                     .unwrap_or_else(|e| {
