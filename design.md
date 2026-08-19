@@ -210,32 +210,32 @@ _Touches: `app.rs`, `ui.rs`, `event.rs`_
 
 A scrollable multiline text area for the POST body. Basic editing in Insert mode.
 _Touches: `app.rs`, `ui.rs`, `event.rs`_
--->
 
 ### #8 — Auth tab
 
 Choose auth type with `j`/`k` (None / Bearer / Basic / API key) and fill in the
-relevant fields. Apply the selected auth to outgoing requests in `http::send`.  
+relevant fields. Apply the selected auth to outgoing requests in `http::send`.
 _Touches: `request.rs`, `http.rs`, `ui.rs`, `app.rs`_
 
 ### #9 — Collections sidebar
 
 Display collections with expandable request lists. Navigate with `j`/`k`,
 expand/collapse a collection with `Enter`, load a request into the builder with `Enter`
-on a request row.  
+on a request row.
 _Touches: `app.rs`, `ui.rs`, `event.rs`_
 
 ### #10 — Save and load collections
 
 Persist collections to `~/.config/scout/collections.json`. Load on startup; save on `S`.
-Create the config directory if it doesn't exist.  
+Create the config directory if it doesn't exist.
 _Touches: `request.rs`, `app.rs`, `main.rs`_
 
 ### #11 — Pretty-print JSON responses
 
 Detect `content-type: application/json` in the response and pretty-print the body with
-indentation using `serde_json::to_string_pretty`.  
+indentation using `serde_json::to_string_pretty`.
 _Touches: `ui.rs` or `app.rs`_
+-->
 
 ### #12 — Scrollable response body
 

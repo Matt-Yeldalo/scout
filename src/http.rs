@@ -1,8 +1,6 @@
 use crate::request::{Request, Response};
 use anyhow::Result;
 
-/// Fire an HTTP request and return the response.
-/// Intended to be called inside a `tokio::spawn` task.
 pub async fn send(request: Request) -> Result<Response> {
     let req_builder = build_request(&request)?;
     let start_time = std::time::Instant::now();
@@ -34,17 +32,14 @@ fn build_request(request: &Request) -> Result<reqwest::RequestBuilder> {
         crate::request::HttpMethod::Post => client.post(&request.url),
     };
 
-    // Add headers
     for (key, value) in &request.headers {
         req_builder = req_builder.header(key, value);
     }
 
-    // Add body if present
     if let Some(body) = &request.body {
         req_builder = req_builder.body(body.clone());
     }
 
-    // Add authentication if present
     match &request.auth {
         crate::request::Auth::Bearer(token) => {
             req_builder = req_builder.bearer_auth(token);

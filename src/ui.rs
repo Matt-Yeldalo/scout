@@ -22,15 +22,15 @@ pub fn render(frame: &mut Frame, app: &App) {
 
     // --- Horizontal split ---
     let [sidebar_area, right_area] =
-        // Layout::horizontal([Constraint::Percentage(25), Constraint::Percentage(75)])
-        //     .areas(main_area);
-        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(main_area);
+        Layout::horizontal([Constraint::Percentage(25), Constraint::Percentage(75)])
+            .areas(main_area);
+        // Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(main_area);
 
     // --- Top and bottm of right panel ---
     let [builder_area, response_area] =
-        // Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)])
-        //     .areas(right_area);
-        Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)]).areas(right_area);
+        Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)])
+            .areas(right_area);
+        // Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)]).areas(right_area);
 
     let mut response_scrollbar = app.response_scrollbar.clone();
 
@@ -421,6 +421,7 @@ fn render_response(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(
         Paragraph::new(text)
             .style(Style::default().fg(status_color))
+            .scroll((app.response_scroll, 0))
             .block(block),
         area,
     );

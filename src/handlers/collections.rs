@@ -1,4 +1,4 @@
-use crate::app::{App, Collection, CollectionState, Focus, InputMode, RequestTab};
+use crate::{app::{App, Collection, CollectionState, Focus, InputMode, RequestTab}, request::{Auth, AuthDraft}};
 use crossterm::event::{KeyCode, KeyEvent};
 use uuid::Uuid;
 
@@ -97,6 +97,8 @@ impl App {
                     if let Some(collection) = self.collections.get(collection_index) {
                         if let Some(request) = collection.requests.get(selected_request) {
                             self.active_request = request.clone();
+                            self.auth_draft = AuthDraft::from(&self.active_request.auth);
+                            self.auth_kind = self.auth_draft.kind.clone();
                             self.active_tab = RequestTab::Url;
                             self.focus = Focus::RequestBuilder;
                         }
