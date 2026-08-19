@@ -1,11 +1,12 @@
 use crate::request::Response;
 use anyhow::Result;
-use crossterm::event::{Event, KeyEvent};
+use crossterm::event::{Event, KeyEvent, MouseEvent};
 use std::fmt;
 
 pub enum AppEvent {
     Key(KeyEvent),
     HttpResponse(Response),
+    Mouse(MouseEvent),
 }
 
 impl fmt::Display for AppEvent {
@@ -13,6 +14,7 @@ impl fmt::Display for AppEvent {
         match self {
             AppEvent::Key(key) => write!(f, "Key({:?})", key),
             AppEvent::HttpResponse(_) => write!(f, "HttpResponse(...)"),
+            AppEvent::Mouse(mouse_event) => write!(f, "Mouse({:?})", mouse_event),
         }
     }
 }
@@ -23,11 +25,18 @@ pub async fn next(
 ) -> Result<AppEvent> {
     tokio::select! {
         maybe_event = futures::StreamExt::next(event_stream) => {
-            if let Some(Ok(Event::Key(key))) = maybe_event {
-                return Ok(AppEvent::Key(key));
-            } else{
-                return Ok(AppEvent::Key(KeyEvent::from(crossterm::event::KeyCode::Null)));
+            match maybe_event {
+                Some(Ok(Event::Key(key))) => return Ok(AppEvent::Key(key)),
+                Some(Ok(Event::Mouse(mouse_event))) => return Ok(AppEvent::Mouse(mouse_event)),
+                Some(Err(e)) => return Err(anyhow::anyhow!("Error reading event: {}", e)),
+                None => return Err(anyhow::anyhow!("Event stream closed")),
+                _ => return Err(anyhow::anyhow!("Unexpected event type")),
             }
+            // if let Some(Ok(Event::Key(key))) = maybe_event {
+            //     return Ok(AppEvent::Key(key));
+            // } else{
+            //     return Ok(AppEvent::Key(KeyEvent::from(crossterm::event::KeyCode::Null)));
+            // }
         }
         maybe_response = receiver.recv() => {
             if let Some(response) = maybe_response {

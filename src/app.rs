@@ -1,5 +1,5 @@
 use crate::{
-    event::AppEvent, http::send, notifier::Notifier, request::{AuthDraft, AuthKind}
+    event::AppEvent, http::send, notifier::Notifier, request::{AuthDraft, AuthKind}, ui::UiDimensions
 };
 use crate::{
     local_store::{LocalStore, StoreKey},
@@ -75,7 +75,6 @@ pub enum HeaderField {
     Value,
 }
 
-// #[derive(Clone)]
 pub struct App {
     pub local_store: LocalStore,
     pub debug: bool,
@@ -106,6 +105,7 @@ pub struct App {
     pub editing_auth_field: Option<AuthField>,
     pub clipboard: arboard::Clipboard,
     pub notifier: Notifier,
+    pub ui_dimensions: UiDimensions,
 }
 
 impl App {
@@ -155,6 +155,7 @@ impl App {
             auth_kind: AuthKind::None,
             editing_auth_field: None,
             notifier: Notifier::default(),
+            ui_dimensions: UiDimensions::default(),
         }
     }
 
@@ -176,6 +177,7 @@ impl App {
 
     pub fn update(&mut self, event: AppEvent) {
         match event {
+            AppEvent::Mouse(mouse_event) => self.handle_mouse_event(mouse_event),
             AppEvent::Key(key) => self.handle_key(key),
             AppEvent::HttpResponse(response) => {
                 let collection = self
@@ -202,6 +204,15 @@ impl App {
                     self.error_message = Some(format!("Failed to save response: {}", e));
                 }
             }
+        }
+    }
+
+    fn handle_mouse_event(&mut self, mouse_event: crossterm::event::MouseEvent) {
+        match self.focus {
+            // Focus::Collections => handle_collections_mouse(self, mouse_event),
+            // Focus::RequestBuilder => handle_request_builder_mouse(self, mouse_event),
+            Focus::Response => self.handle_response_mouse(mouse_event),
+            _ => {}
         }
     }
 

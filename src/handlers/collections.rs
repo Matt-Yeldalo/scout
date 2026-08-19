@@ -1,4 +1,7 @@
-use crate::{app::{App, Collection, CollectionState, Focus, InputMode, RequestTab}, request::{Auth, AuthDraft}};
+use crate::{
+    app::{App, Collection, CollectionState, Focus, InputMode, RequestTab},
+    request::{Auth, AuthDraft},
+};
 use crossterm::event::{KeyCode, KeyEvent};
 use uuid::Uuid;
 

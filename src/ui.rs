@@ -12,9 +12,18 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph, ScrollbarState, Tabs},
 };
 
+#[derive(Default, Clone)]
+pub struct UiDimensions {
+    pub collections_area: Rect,
+    pub request_builder_area: Rect,
+    pub response_area: Rect,
+    pub notifier_area: Rect,
+    pub toolbar_area: Rect,
+}
+
 /// Entry point called by the main loop on every frame.
 /// This function must never mutate `app` — it is a pure read.
-pub fn render(frame: &mut Frame, app: &App) {
+pub fn render(frame: &mut Frame, app: &App) -> UiDimensions {
     // --- Top-level split ---
     // `Length(1)` takes exactly 1 row. `Min(0)` takes all remaining rows.
     let [main_area, notifier_area, toolbar] = Layout::vertical([
@@ -49,6 +58,14 @@ pub fn render(frame: &mut Frame, app: &App) {
     render_notifier(frame, app, notifier_area);
     render_toolbar(frame, app, toolbar);
     render_error(frame, app);
+
+    UiDimensions {
+        collections_area: sidebar_area,
+        request_builder_area: builder_area,
+        response_area,
+        notifier_area,
+        toolbar_area: toolbar,
+    }
 }
 
 fn render_error(frame: &mut Frame, app: &App) {

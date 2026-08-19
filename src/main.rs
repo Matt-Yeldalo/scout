@@ -1,21 +1,21 @@
 mod app;
 mod event;
-mod http;
-mod request;
-mod ui;
-mod local_store;
-mod toolbar;
 mod handlers;
+mod http;
+mod local_store;
 mod notifier;
+mod request;
+mod toolbar;
+mod ui;
 
-use crate::event::AppEvent;
+use crate::{event::AppEvent, ui::UiDimensions};
 use anyhow::Result;
 use app::App;
 use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{backend::CrosstermBackend, widgets::TableState, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend, widgets::TableState};
 use std::io::{self, Stdout};
 
 // A type alias so we don't repeat `CrosstermBackend<Stdout>` in every signature.
@@ -62,10 +62,12 @@ async fn run(
     receiver: &mut tokio::sync::mpsc::Receiver<AppEvent>,
 ) -> Result<()> {
     let mut event_stream = crossterm::event::EventStream::new();
+    let mut last_dimenions = UiDimensions::default();
     loop {
-        terminal.draw(|frame| ui::render(frame, &app))?;
+        terminal.draw(|frame| last_dimenions = ui::render(frame, &app))?;
 
         let event = event::next(receiver, &mut event_stream).await?;
+        app.ui_dimensions = last_dimenions.clone();
         app.update(event);
 
         if app.should_quit {
