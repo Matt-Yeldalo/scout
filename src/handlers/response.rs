@@ -6,7 +6,15 @@ impl App {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => self.scroll_down(),
             KeyCode::Char('k') | KeyCode::Up => self.scroll_up(),
+            KeyCode::Char('y') => self.copy_response(),
             _ => {}
+        }
+    }
+
+    fn copy_response(&mut self) {
+        if let Some(response) = &self.response {
+            self.clipboard.set_text(response.body.clone()).unwrap();
+            self.notifier.notify(crate::notifier::NotifyType::Info, "Response copied to clipboard".to_string());
         }
     }
 

@@ -6,6 +6,7 @@ mod ui;
 mod local_store;
 mod toolbar;
 mod handlers;
+mod notifier;
 
 use crate::event::AppEvent;
 use anyhow::Result;

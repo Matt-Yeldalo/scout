@@ -3,7 +3,7 @@ use crate::request::{AuthKind, HttpMethod};
 use crate::toolbar::toolbar_hints;
 use ratatui::layout::Margin;
 use ratatui::style::Stylize;
-use ratatui::widgets::{Scrollbar, ScrollbarOrientation};
+use ratatui::widgets::{Padding, Scrollbar, ScrollbarOrientation};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
@@ -17,20 +17,24 @@ use ratatui::{
 pub fn render(frame: &mut Frame, app: &App) {
     // --- Top-level split ---
     // `Length(1)` takes exactly 1 row. `Min(0)` takes all remaining rows.
-    let [main_area, status_bar] =
-        Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(frame.area());
+    let [main_area, notifier_area, toolbar] = Layout::vertical([
+        Constraint::Min(0),
+        Constraint::Length(if app.notifier.ready() { 1 } else { 0 }),
+        Constraint::Length(1),
+    ])
+    .areas(frame.area());
 
     // --- Horizontal split ---
     let [sidebar_area, right_area] =
         Layout::horizontal([Constraint::Percentage(25), Constraint::Percentage(75)])
             .areas(main_area);
-        // Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(main_area);
+    // Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(main_area);
 
     // --- Top and bottm of right panel ---
     let [builder_area, response_area] =
         Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)])
             .areas(right_area);
-        // Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)]).areas(right_area);
+    // Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)]).areas(right_area);
 
     let mut response_scrollbar = app.response_scrollbar.clone();
 
@@ -42,7 +46,8 @@ pub fn render(frame: &mut Frame, app: &App) {
     render_response(frame, app, response_area);
     render_vertical_scrollbar(frame, response_area, &mut response_scrollbar);
 
-    render_status_bar(frame, app, status_bar);
+    render_notifier(frame, app, notifier_area);
+    render_toolbar(frame, app, toolbar);
     render_error(frame, app);
 }
 
@@ -344,11 +349,7 @@ fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(
         Paragraph::new(auth_text)
             .style(Style::default().fg(Color::White))
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(title),
-            ),
+            .block(Block::default().borders(Borders::ALL).title(title)),
         area,
     );
 }
@@ -472,10 +473,19 @@ fn build_response_text(app: &App, resp: &crate::request::Response) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Status bar
+// Notifier
 // ---------------------------------------------------------------------------
+fn render_notifier(frame: &mut Frame, app: &App, area: Rect) {
+    frame.render_widget(
+        Paragraph::new(app.notifier.display()).style(app.notifier.style()),
+        area,
+    );
+}
 
-fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
+// ---------------------------------------------------------------------------
+// Toolbar
+// ---------------------------------------------------------------------------
+fn render_toolbar(frame: &mut Frame, app: &App, area: Rect) {
     // The mode badge uses a coloured background to make it stand out.
     // Blue = Normal (calm, navigating), Green = Insert (active, editing).
     let (mode_label, mode_style) = match app.input_mode {
@@ -495,23 +505,6 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         ),
     };
 
-    // Show context-sensitive hints so the user always knows what keys do something.
-    // let hints = match app.input_mode {
-    //     InputMode::Normal => {
-    //         "  [tab] cycle focus   [h/l] switch tab   [i] insert   [m] method   [s] send   [q] quit"
-    //     }
-    //     InputMode::Insert => "  [esc] back to normal",
-    // };
-
-    // how do I use this method that live in src/toolbar.rs?
-    // you can call the `toolbar_hints` function from the `toolbar` module. First, make sure to import it at the top of your file:
-    // use crate::toolbar::toolbar_hints;
-    // Then, you can call it like this:
-    // its saying could not find in crate root
-    // I added mod toolbar but now it wants me to to move the toolbar.rs file into a folder called toolbar and rename it mod.rs. I don't want to do that. I just want to call the function in toolbar.rs from ui.rs. How do I do that?
-    // You can call the function directly by using the module path. Since `toolbar.rs`
-    // is in the same directory as `ui.rs`, you can call the function like this:
-    //
     let hints = toolbar_hints(app);
 
     // `Line::from` builds a single terminal line from styled `Span`s.

@@ -1,7 +1,5 @@
 use crate::{
-    event::AppEvent,
-    http::send,
-    request::{AuthDraft, AuthKind},
+    event::AppEvent, http::send, notifier::Notifier, request::{AuthDraft, AuthKind}
 };
 use crate::{
     local_store::{LocalStore, StoreKey},
@@ -77,7 +75,7 @@ pub enum HeaderField {
     Value,
 }
 
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct App {
     pub local_store: LocalStore,
     pub debug: bool,
@@ -106,6 +104,8 @@ pub struct App {
     pub auth_draft: AuthDraft,
     pub auth_kind: AuthKind,
     pub editing_auth_field: Option<AuthField>,
+    pub clipboard: arboard::Clipboard,
+    pub notifier: Notifier,
 }
 
 impl App {
@@ -115,6 +115,10 @@ impl App {
     ) -> Self {
         let local_store = LocalStore::new();
         let collections = local_store.load_all().unwrap_or_else(|_| Vec::new());
+        let clipboard = arboard::Clipboard::new().unwrap_or_else(|_| {
+            eprintln!("Failed to initialize clipboard");
+            std::process::exit(1);
+        });
         let mut collection_list_state = ListState::default();
         if collections.is_empty() {
             collection_list_state.select(None);
@@ -127,6 +131,7 @@ impl App {
             headers_table_state,
             collections,
             collection_list_state,
+            clipboard,
             debug: true,
             should_quit: false,
             input_mode: InputMode::Normal,
@@ -149,6 +154,7 @@ impl App {
             auth_draft: AuthDraft::default(),
             auth_kind: AuthKind::None,
             editing_auth_field: None,
+            notifier: Notifier::default(),
         }
     }
 
