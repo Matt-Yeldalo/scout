@@ -1,5 +1,10 @@
 use crate::{
-    event::AppEvent, http::send, notifier::Notifier, request::{AuthDraft, AuthKind}, ui::UiDimensions
+    event::AppEvent,
+    http::send,
+    input::TextInput,
+    notifier::{Notifier, NotifyType},
+    request::{AuthDraft, AuthKind},
+    ui::UiDimensions,
 };
 use crate::{
     local_store::{LocalStore, StoreKey},
@@ -9,6 +14,18 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::{ListState, ScrollbarState, TableState};
 use serde::{Deserialize, Serialize};
 use tui_textarea::TextArea;
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub enum EditContext {
+    #[default]
+    None,
+    RequestUrl,
+    VariableKey,
+    HeaderKey(usize),
+    HeaderValue(usize),
+    AuthField(AuthField),
+    VariableValue,
+}
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum InputMode {
@@ -23,6 +40,7 @@ pub enum Focus {
     Collections,
     RequestBuilder,
     Response,
+    Variables,
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -39,6 +57,7 @@ pub struct Collection {
     pub id: String,
     pub name: String,
     pub requests: Vec<Request>,
+    pub variables: Vec<(String, String)>,
 }
 impl std::fmt::Display for Collection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -106,6 +125,10 @@ pub struct App {
     pub clipboard: arboard::Clipboard,
     pub notifier: Notifier,
     pub ui_dimensions: UiDimensions,
+    pub variables_table_state: TableState,
+    pub auth_basic_table_state: TableState,
+    pub edit_context: EditContext,
+    pub active_input: TextInput,
 }
 
 impl App {
@@ -113,8 +136,27 @@ impl App {
         sender: tokio::sync::mpsc::Sender<AppEvent>,
         headers_table_state: TableState,
     ) -> Self {
+        let mut auth_basic_table_state = TableState::default();
+        auth_basic_table_state.select_first();
+        auth_basic_table_state.select_first_column();
+
         let local_store = LocalStore::new();
-        let collections = local_store.load_all().unwrap_or_else(|_| Vec::new());
+        let mut notifier = Notifier::default();
+        let collections = match local_store.load_all() {
+            Ok(collections) => {
+                if collections.is_empty() {
+                    eprintln!("No collections found. Please create a collection first.");
+                }
+                collections
+            }
+            Err(e) => {
+                notifier.notify(
+                    NotifyType::Error,
+                    format!("Failed to load collections: {}", e),
+                );
+                Vec::new()
+            }
+        };
         let clipboard = arboard::Clipboard::new().unwrap_or_else(|_| {
             eprintln!("Failed to initialize clipboard");
             std::process::exit(1);
@@ -129,9 +171,12 @@ impl App {
             local_store: local_store.clone(),
             sender,
             headers_table_state,
+            auth_basic_table_state,
             collections,
             collection_list_state,
             clipboard,
+            notifier,
+            // debug: true,
             debug: true,
             should_quit: false,
             input_mode: InputMode::Normal,
@@ -154,8 +199,10 @@ impl App {
             auth_draft: AuthDraft::default(),
             auth_kind: AuthKind::None,
             editing_auth_field: None,
-            notifier: Notifier::default(),
             ui_dimensions: UiDimensions::default(),
+            variables_table_state: TableState::default(),
+            edit_context: EditContext::None,
+            active_input: TextInput::new(),
         }
     }
 
@@ -187,8 +234,12 @@ impl App {
                 let collection = match collection {
                     Some(c) => c,
                     None => {
-                        self.error_message =
-                            Some("No active collection to save response".to_string());
+                        self.notifier.notify(
+                            NotifyType::Error,
+                            "No active collection to save response".to_string(),
+                        );
+                        // self.error_message =
+                        //     Some("No active collection to save response".to_string());
                         return;
                     }
                 };
@@ -201,7 +252,9 @@ impl App {
                 let key = StoreKey::from(&collection, &self.active_request);
                 let result = self.local_store.update_responses(key, &response);
                 if let Err(e) = result {
-                    self.error_message = Some(format!("Failed to save response: {}", e));
+                    // self.error_message = Some(format!("Failed to save response: {}", e));
+                    self.notifier
+                        .notify(NotifyType::Error, format!("Failed to save response: {}", e));
                 }
             }
         }
@@ -240,6 +293,7 @@ impl App {
             Focus::Collections => self.handle_collections_normal(key),
             Focus::RequestBuilder => self.handle_request_builder_normal(key),
             Focus::Response => self.handle_response_normal(key),
+            Focus::Variables => self.handle_variables_normal(key),
         }
     }
 
@@ -248,15 +302,35 @@ impl App {
             Focus::Collections => self.handle_collections_insert(key),
             Focus::RequestBuilder => self.handle_request_builder_insert(key),
             Focus::Response => {}
+            Focus::Variables => self.handle_variables_insert(key),
         }
     }
 
-    fn tab_changed_callback(&mut self) {}
+    pub fn get_active_collection(&self) -> Option<&Collection> {
+        self.collections.get(self.active_collection.unwrap_or(0))
+    }
+
+    pub fn get_active_collection_mut(&mut self) -> Option<&mut Collection> {
+        let index = self.active_collection.unwrap_or(0);
+        self.collections.get_mut(index)
+    }
+
+    fn tab_changed_callback(&mut self) {
+        match self.focus {
+            Focus::Variables => {
+                self.variables_table_state.select(Some(0));
+                self.edit_context = EditContext::VariableKey;
+            }
+            _ => {}
+        }
+    }
+
     fn cycle_focus(&mut self) {
         self.focus = match self.focus {
             Focus::Collections => Focus::RequestBuilder,
             Focus::RequestBuilder => Focus::Response,
-            Focus::Response => Focus::Collections,
+            Focus::Response => Focus::Variables,
+            Focus::Variables => Focus::Collections, // wrap around
         };
     }
     pub fn next_tab(&mut self) {

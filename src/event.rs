@@ -30,7 +30,8 @@ pub async fn next(
                 Some(Ok(Event::Mouse(mouse_event))) => return Ok(AppEvent::Mouse(mouse_event)),
                 Some(Err(e)) => return Err(anyhow::anyhow!("Error reading event: {}", e)),
                 None => return Err(anyhow::anyhow!("Event stream closed")),
-                _ => return Err(anyhow::anyhow!("Unexpected event type")),
+                // _ => return Err(anyhow::anyhow!("Unexpected event type")),
+                _ => Ok(AppEvent::Key(KeyEvent::from(crossterm::event::KeyCode::Null))),
             }
             // if let Some(Ok(Event::Key(key))) = maybe_event {
             //     return Ok(AppEvent::Key(key));

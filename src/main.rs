@@ -7,6 +7,7 @@ mod notifier;
 mod request;
 mod toolbar;
 mod ui;
+mod input;
 
 use crate::{event::AppEvent, ui::UiDimensions};
 use anyhow::Result;

@@ -6,7 +6,6 @@ pub fn toolbar_hints(app: &App) -> String {
             match app.focus {
                 Focus::Collections => match app.collection_ui_state {
                     CollectionState::CollectionList => {
-                        // "  [tab] cycle focus   [h/j] up/down   [i] edit collection     [s] save   [q] quit".to_string()
                         vec![
                             "[tab] cycle focus",
                             "[k/j] up/down",
@@ -29,17 +28,6 @@ pub fn toolbar_hints(app: &App) -> String {
                         ]
                     }
                 },
-                // "  [tab] cycle focus   [h/l] switch tab   [i] insert   [m] method   [s] send   [q] quit".to_string()
-                // Focus::RequestBuilder => {
-                //     vec![
-                //         "[tab] cycle focus",
-                //         "[h/l] switch tab",
-                //         "[i] insert",
-                //         "[m] method",
-                //         "[s] send",
-                //         "[q] quit",
-                //     ]
-                // }
                 Focus::RequestBuilder => match app.active_tab {
                     RequestTab::Auth => {
                         vec![
@@ -73,9 +61,18 @@ pub fn toolbar_hints(app: &App) -> String {
                         "[q] quit",
                     ]
                 }
+                Focus::Variables => {
+                    vec![
+                        "[tab] cycle focus",
+                        "[k/j] up/down",
+                        "[i] edit variable",
+                        "[a] add row",
+                        "[s] save",
+                        "[q] quit",
+                    ]
+                }
             }
         }
-        // InputMode::Insert => "  [esc] back to normal".to_string(),
         InputMode::Insert => vec!["[esc] back to normal"],
     };
     build_toolbar(&parts)

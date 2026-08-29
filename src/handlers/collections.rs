@@ -1,3 +1,5 @@
+
+
 use crate::{
     app::{App, Collection, CollectionState, Focus, InputMode, RequestTab},
     request::{Auth, AuthDraft},
@@ -28,10 +30,12 @@ impl App {
             }
             KeyCode::Char('n') => {
                 let id = Uuid::new_v4().to_string();
+                // TODO: add default to collection
                 self.collections.push(Collection {
                     id,
                     name: "New Collection".to_string(),
                     requests: Vec::new(),
+                    variables: Vec::new(),
                 });
                 self.input_mode = InputMode::Insert;
                 self.update_collection_list_state(Some(self.collections.len() - 1));

@@ -119,7 +119,7 @@ impl App {
         }
     }
 
-    fn handle_normal_up(&mut self, key: KeyEvent) {
+    fn handle_normal_up(&mut self, _key: KeyEvent) {
         match self.active_tab {
             RequestTab::Headers => {
                 if self.selected_header_row > 0 {
@@ -158,17 +158,20 @@ impl App {
         }
     }
 
-    fn handle_normal_down(&mut self, key: KeyEvent) {
+    fn handle_normal_down(&mut self, _key: KeyEvent) {
         match self.active_tab {
             RequestTab::Auth => match self.auth_kind {
                 AuthKind::Basic => match self.editing_auth_field {
                     Some(AuthField::BasicUsername) => {
                         self.editing_auth_field = Some(AuthField::BasicPassword);
+                        self.auth_basic_table_state.select(Some(1));
                     }
                     Some(AuthField::BasicPassword) => {
                         self.editing_auth_field = Some(AuthField::BasicUsername);
+                        self.auth_basic_table_state.select(Some(0));
                     }
                     None => {
+                        self.auth_basic_table_state.select(Some(0));
                         self.editing_auth_field = Some(AuthField::BasicUsername);
                     }
                     _ => {}
@@ -247,9 +250,15 @@ impl App {
                 None => {}
             },
             KeyCode::Backspace => match self.auth_kind {
-                AuthKind::Basic => {
-                    self.auth_draft.basic_username.pop();
-                }
+                AuthKind::Basic => match self.editing_auth_field {
+                    Some(AuthField::BasicUsername) => {
+                        self.auth_draft.basic_username.pop();
+                    }
+                    Some(AuthField::BasicPassword) => {
+                        self.auth_draft.basic_password.pop();
+                    }
+                    _ => {}
+                },
                 AuthKind::Bearer => {
                     self.auth_draft.bearer_token.pop();
                 }

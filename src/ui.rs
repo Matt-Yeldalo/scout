@@ -1,4 +1,4 @@
-use crate::app::{App, CollectionState, Focus, InputMode, RequestTab};
+use crate::app::{App, CollectionState, EditContext, Focus, InputMode, RequestTab};
 use crate::request::{AuthKind, HttpMethod};
 use crate::toolbar::toolbar_hints;
 use ratatui::layout::Margin;
@@ -21,8 +21,6 @@ pub struct UiDimensions {
     pub toolbar_area: Rect,
 }
 
-/// Entry point called by the main loop on every frame.
-/// This function must never mutate `app` — it is a pure read.
 pub fn render(frame: &mut Frame, app: &App) -> UiDimensions {
     // --- Top-level split ---
     // `Length(1)` takes exactly 1 row. `Min(0)` takes all remaining rows.
@@ -48,11 +46,13 @@ pub fn render(frame: &mut Frame, app: &App) -> UiDimensions {
     let mut response_scrollbar = app.response_scrollbar.clone();
 
     render_collections(frame, app, sidebar_area);
-    render_debug_info(frame, app, sidebar_area);
+    // render_debug_info(frame, app, sidebar_area);
+    render_variables(frame, app, sidebar_area);
 
     render_request_builder(frame, app, builder_area);
 
     render_response(frame, app, response_area);
+    // render_debug_info(frame, app, response_area);
     render_vertical_scrollbar(frame, response_area, &mut response_scrollbar);
 
     render_notifier(frame, app, notifier_area);
@@ -111,7 +111,6 @@ fn render_vertical_scrollbar(frame: &mut Frame, area: Rect, vertical: &mut Scrol
 }
 
 /// A bordered panel whose border turns yellow when it has focus.
-/// The visual highlight tells you at a glance which panel will receive input.
 fn focused_block(title: &str, focused: bool) -> Block<'_> {
     let border_style = if focused {
         Style::default().fg(Color::Yellow)
@@ -304,6 +303,30 @@ fn render_url_tab(frame: &mut Frame, app: &App, area: Rect) {
         (url_str, Style::default().fg(Color::White))
     };
 
+    if app.input_mode == InputMode::Insert && app.active_tab == RequestTab::Url {
+        let spans = url_str
+            .chars()
+            .enumerate()
+            .map(|(i, c)| {
+                if i == app.active_input.cursor {
+                    Span::styled(
+                        c.to_string(),
+                        Style::default().bg(Color::Yellow).fg(Color::Black),
+                    )
+                } else {
+                    Span::raw(c.to_string())
+                }
+            })
+            .collect::<Vec<_>>();
+        frame.render_widget(
+            Paragraph::new(Line::from(spans))
+                .style(Style::default().fg(Color::White))
+                .block(Block::default().borders(Borders::NONE)),
+            url_area,
+        );
+        return;
+    }
+
     frame.render_widget(Paragraph::new(url_display).style(url_style), url_area);
 }
 
@@ -342,33 +365,166 @@ fn render_headers_tab(frame: &mut Frame, app: &App, area: Rect) {
     );
 }
 
+// fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
+//     let auth_draft = app.auth_draft.clone();
+//     let auth_text = match app.auth_kind {
+//         AuthKind::Bearer => auth_draft.bearer_token,
+//         AuthKind::Basic => format!(
+//             "Username: {}\nPassword: {}",
+//             auth_draft.basic_username, auth_draft.basic_password
+//         ),
+//         AuthKind::ApiKey => format!(
+//             "Header: {}\nValue: {}",
+//             auth_draft.api_key_header, auth_draft.api_key_value
+//         ),
+//         AuthKind::None => "(no authentication)".to_string(),
+//     };
+//     let title = match app.auth_kind {
+//         AuthKind::Bearer => "Bearer Token",
+//         AuthKind::Basic => "Basic Auth",
+//         AuthKind::ApiKey => "API Key",
+//         AuthKind::None => "No Auth",
+//     };
+//
+//     frame.render_widget(
+//         Paragraph::new(auth_text)
+//             .style(Style::default().fg(Color::White))
+//             .block(Block::default().borders(Borders::ALL).title(title)),
+//         area,
+//     );
+// }
 fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
     let auth_draft = app.auth_draft.clone();
-    let auth_text = match app.auth_kind {
-        AuthKind::Bearer => auth_draft.bearer_token,
-        AuthKind::Basic => format!(
-            "Username: {}\nPassword: {}",
-            auth_draft.basic_username, auth_draft.basic_password
-        ),
-        AuthKind::ApiKey => format!(
-            "Header: {}\nValue: {}",
-            auth_draft.api_key_header, auth_draft.api_key_value
-        ),
-        AuthKind::None => "(no authentication)".to_string(),
-    };
-    let title = match app.auth_kind {
-        AuthKind::Bearer => "Bearer Token",
-        AuthKind::Basic => "Basic Auth",
-        AuthKind::ApiKey => "API Key",
-        AuthKind::None => "No Auth",
-    };
+    match app.auth_kind {
+        // AuthKind::Bearer => auth_draft.bearer_token,
+        AuthKind::Bearer => {
+            let rows = vec![ratatui::widgets::Row::new(vec![
+                "Token",
+                auth_draft.bearer_token.as_str(),
+            ])];
+            let table =
+                ratatui::widgets::Table::new(rows, [Constraint::Length(20), Constraint::Min(0)])
+                    .header(ratatui::widgets::Row::new(vec![
+                        Span::styled("Key", Style::default().bold()),
+                        Span::styled("Value", Style::default().bold()),
+                    ]))
+                    .block(Block::default())
+                    .widths(&[Constraint::Length(20), Constraint::Min(0)])
+                    .row_highlight_style(Style::new().on_black().bold())
+                    .column_highlight_style(Color::Gray)
+                    .cell_highlight_style(Style::new().reversed().yellow())
+                    .highlight_symbol("> ");
+            frame.render_widget(table, area);
 
-    frame.render_widget(
-        Paragraph::new(auth_text)
-            .style(Style::default().fg(Color::White))
-            .block(Block::default().borders(Borders::ALL).title(title)),
-        area,
-    );
+            // frame.render_widget(
+            //     table
+            //         .header(ratatui::widgets::Row::new(vec![
+            //             Span::styled("Key", Style::default().bold()),
+            //             Span::styled("Value", Style::default().bold()),
+            //         ]))
+            //         .block(Block::default())
+            //         .widths(&[Constraint::Length(20), Constraint::Min(0)])
+            //         .row_highlight_style(Style::new().on_black().bold())
+            //         .column_highlight_style(Color::Gray)
+            //         .cell_highlight_style(Style::new().reversed().yellow())
+            //         .highlight_symbol("> "),
+            //     area,
+            // );
+        }
+        // AuthKind::Basic => format!(
+        //     "Username: {}\nPassword: {}",
+        //     auth_draft.basic_username, auth_draft.basic_password
+        // ),
+        AuthKind::Basic => {
+            let rows = vec![
+                ratatui::widgets::Row::new(vec!["Username", auth_draft.basic_username.as_str()]),
+                ratatui::widgets::Row::new(vec!["Password", auth_draft.basic_password.as_str()]),
+            ];
+            let table =
+                ratatui::widgets::Table::new(rows, [Constraint::Length(20), Constraint::Min(0)])
+                    .header(ratatui::widgets::Row::new(vec![
+                        Span::styled("Key", Style::default().bold()),
+                        Span::styled("Value", Style::default().bold()),
+                    ]))
+                    .block(Block::default())
+                    .widths(&[Constraint::Length(20), Constraint::Min(0)])
+                    .row_highlight_style(Style::new().on_black().bold())
+                    .column_highlight_style(Color::Gray)
+                    .cell_highlight_style(Style::new().reversed().yellow())
+                    .highlight_symbol("> ");
+            // ratatui::widgets::Table::new(rows, [Constraint::Length(20), Constraint::Min(0)]);
+            frame.render_stateful_widget(table, area, &mut app.auth_basic_table_state.clone());
+        }
+        // AuthKind::ApiKey => format!(
+        //     "Header: {}\nValue: {}",
+        //     auth_draft.api_key_header, auth_draft.api_key_value
+        // ),
+        AuthKind::ApiKey => {
+            let rows = vec![
+                ratatui::widgets::Row::new(vec!["Header", auth_draft.api_key_header.as_str()]),
+                ratatui::widgets::Row::new(vec!["Value", auth_draft.api_key_value.as_str()]),
+            ];
+            let table =
+                ratatui::widgets::Table::new(rows, [Constraint::Length(20), Constraint::Min(0)])
+                    .header(ratatui::widgets::Row::new(vec![
+                        Span::styled("Key", Style::default().bold()),
+                        Span::styled("Value", Style::default().bold()),
+                    ]))
+                    .block(Block::default())
+                    .widths(&[Constraint::Length(20), Constraint::Min(0)])
+                    .row_highlight_style(Style::new().on_black().bold())
+                    .column_highlight_style(Color::Gray)
+                    .cell_highlight_style(Style::new().reversed().yellow())
+                    .highlight_symbol("> ");
+            frame.render_widget(table, area);
+        }
+        // AuthKind::None => "(no authentication)".to_string(),
+        AuthKind::None => {
+            let rows = vec![ratatui::widgets::Row::new(vec!["", "(no authentication)"])];
+            let table =
+                ratatui::widgets::Table::new(rows, [Constraint::Length(20), Constraint::Min(0)])
+                    .header(ratatui::widgets::Row::new(vec![
+                        Span::styled("Key", Style::default().bold()),
+                        Span::styled("Value", Style::default().bold()),
+                    ]))
+                    .block(Block::default())
+                    .widths(&[Constraint::Length(20), Constraint::Min(0)])
+                    .row_highlight_style(Style::new().on_black().bold())
+                    .column_highlight_style(Color::Gray)
+                    .cell_highlight_style(Style::new().reversed().yellow())
+                    .highlight_symbol("> ");
+            frame.render_widget(table, area);
+        }
+    };
+    // let title = match app.auth_kind {
+    //     AuthKind::Bearer => "Bearer Token",
+    //     AuthKind::Basic => "Basic Auth",
+    //     AuthKind::ApiKey => "API Key",
+    //     AuthKind::None => "No Auth",
+    // };
+
+    // frame.render_stateful_widget(
+    //     table
+    //     .header(ratatui::widgets::Row::new(vec![
+    //         Span::styled("Key", Style::default().bold()),
+    //         Span::styled("Value", Style::default().bold()),
+    //     ]))
+    //     .block(Block::default())
+    //     .widths(&[Constraint::Length(20), Constraint::Min(0)])
+    //     .row_highlight_style(Style::new().on_black().bold())
+    //     .column_highlight_style(Color::Gray)
+    //     .cell_highlight_style(Style::new().reversed().yellow())
+    //     .highlight_symbol("> "),
+    //     area,
+    //     &mut headers_state,
+    // );
+
+    // frame.render_widget(
+    //     Paragraph::new(auth_text)
+    //         .style(Style::default().fg(Color::White))
+    //         .block(Block::default().borders(Borders::ALL).title(title)),
+    //     area,
+    // );
 }
 
 fn render_body_tab(frame: &mut Frame, app: &App, area: Rect) {
@@ -489,6 +645,104 @@ fn build_response_text(app: &App, resp: &crate::request::Response) -> String {
     )
 }
 
+fn render_variables(frame: &mut Frame, app: &App, area: Rect) {
+    let focused = app.focus == Focus::Variables;
+    let block = focused_block("Variables", focused);
+    let widths = [Constraint::Length(20), Constraint::Min(0)];
+    let variables_area = Rect {
+        x: area.x,
+        y: area.y + area.height - 20,
+        width: area.width,
+        height: 20,
+    };
+    let active_collection = app.get_active_collection();
+    let blank_variables = match active_collection {
+        Some(col) => {
+            if col.variables.is_empty() {
+                "(no variables defined)"
+            } else {
+                ""
+            }
+        }
+        None => "(no collection selected)",
+    };
+
+    if blank_variables != "" {
+        frame.render_widget(
+            Paragraph::new(blank_variables)
+                .style(Style::default().fg(Color::DarkGray))
+                .block(block),
+            variables_area,
+        );
+        return;
+    }
+
+    let mut row_variables = Vec::new();
+    for (i, v) in active_collection.unwrap().variables.iter().enumerate() {
+        let v = v.clone();
+        let key: Line = if is_editing_variable_field(&app, EditContext::VariableKey, i) {
+            // Span::styled(&app.active_input.value, Style::default().fg(Color::Yellow))
+            highlighted_variable_field(i, &app.active_input.value)
+        } else {
+            // Span::styled(v.0, Style::default().fg(Color::Cyan))
+            Line::from(Span::styled(v.0, Style::default().fg(Color::Cyan)))
+        };
+        let value = if is_editing_variable_field(&app, EditContext::VariableValue, i) {
+            // Span::styled(&app.active_input.value, Style::default().fg(Color::Yellow))
+            highlighted_variable_field(i, &app.active_input.value)
+        } else {
+            // Span::styled(v.1, Style::default().fg(Color::White))
+            Line::from(Span::styled(v.1, Style::default().fg(Color::White)))
+        };
+
+        let row = ratatui::widgets::Row::new(vec![key, value]);
+        row_variables.push(row);
+    }
+    // let variables = active_collection.unwrap().variables.iter().map(|(k, v)| {
+    //     let key = Span::styled(k, Style::default().fg(Color::Cyan));
+    //     let value = Span::styled(v, Style::default().fg(Color::White));
+    //     ratatui::widgets::Row::new(vec![key, value])
+    // });
+
+    frame.render_stateful_widget(
+        ratatui::widgets::Table::new(row_variables, widths)
+            .header(ratatui::widgets::Row::new(vec![
+                Span::styled("Key", Style::default().bold()),
+                Span::styled("Value", Style::default().bold()),
+            ]))
+            .block(block)
+            .widths(&[Constraint::Length(20), Constraint::Min(0)])
+            .row_highlight_style(Style::new().on_black().bold())
+            .column_highlight_style(Color::Gray)
+            .cell_highlight_style(Style::new().reversed().yellow())
+            .highlight_symbol("> "),
+        variables_area,
+        &mut app.variables_table_state.clone(),
+    );
+}
+
+fn is_editing_variable_field(app: &App, edit_context: EditContext, row: usize) -> bool {
+    if app.input_mode == InputMode::Normal || app.focus != Focus::Variables {
+        return false;
+    }
+
+    app.variables_table_state.selected() == Some(row) && app.edit_context == edit_context
+}
+
+fn highlighted_variable_field(current_index: usize, value: &String) -> Line {
+    let text = value.chars().enumerate().map(|(i, c)| {
+        if i == current_index {
+            Span::styled(
+                c.to_string(),
+                Style::default().bg(Color::Yellow).fg(Color::Black),
+            )
+        } else {
+            Span::raw(c.to_string())
+        }
+    });
+    Line::from(text.collect::<Vec<_>>()).clone()
+}
+
 // ---------------------------------------------------------------------------
 // Notifier
 // ---------------------------------------------------------------------------
@@ -541,7 +795,7 @@ fn render_debug_info(frame: &mut Frame, app: &App, area: Rect) {
         //  response: {:?}\n
         //  selected_header_row: {:?}\tediting_header_field: {:?}\theaders_table_selected: {:?}\n
         //  collection_ui_state: {:?}",
-        "focus: {:?} | tab: {:?} | mode: {:?}\nresponse: {:?}\nselected_header_row: {:?} | editing_header_field: {:?} | headers_table_selected: {:?}\ncollection_ui_state: {:?}\nauth_kind: {:?}\nauth_draft: {:?}\nediting_auth_field: {:?}",
+        "focus: {:?} | tab: {:?} | mode: {:?}\nresponse: {:?}\nselected_header_row: {:?} | editing_header_field: {:?} | headers_table_selected: {:?}\ncollection_ui_state: {:?}\nauth_kind: {:?}\nauth_draft: {:?}\nediting_auth_field: {:?}\nactive_input.value: {:?}\nactive_input.cursor: {:?}\nvariables_table_selected: {:?}\nedit_context: {:?}",
         app.focus,
         app.active_tab,
         app.input_mode,
@@ -552,7 +806,11 @@ fn render_debug_info(frame: &mut Frame, app: &App, area: Rect) {
         app.collection_ui_state,
         app.auth_kind,
         app.auth_draft,
-        app.editing_auth_field.as_ref()
+        app.editing_auth_field.as_ref(),
+        app.active_input.value,
+        app.active_input.cursor,
+        app.variables_table_state.selected(),
+        app.edit_context
     );
 
     let debug_area = Rect {
