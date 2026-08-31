@@ -138,7 +138,7 @@ impl App {
     ) -> Self {
         let mut auth_basic_table_state = TableState::default();
         auth_basic_table_state.select_first();
-        auth_basic_table_state.select_first_column();
+        auth_basic_table_state.select_last_column();
 
         let local_store = LocalStore::new();
         let mut notifier = Notifier::default();

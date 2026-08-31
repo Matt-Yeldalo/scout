@@ -131,9 +131,11 @@ impl App {
                 AuthKind::Basic => match self.editing_auth_field {
                     Some(AuthField::BasicUsername) => {
                         self.editing_auth_field = Some(AuthField::BasicPassword);
+                        self.auth_basic_table_state.select(Some(1));
                     }
                     Some(AuthField::BasicPassword) => {
                         self.editing_auth_field = Some(AuthField::BasicUsername);
+                        self.auth_basic_table_state.select(Some(0));
                     }
                     None => {
                         self.editing_auth_field = Some(AuthField::BasicUsername);

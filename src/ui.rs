@@ -365,34 +365,6 @@ fn render_headers_tab(frame: &mut Frame, app: &App, area: Rect) {
     );
 }
 
-// fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
-//     let auth_draft = app.auth_draft.clone();
-//     let auth_text = match app.auth_kind {
-//         AuthKind::Bearer => auth_draft.bearer_token,
-//         AuthKind::Basic => format!(
-//             "Username: {}\nPassword: {}",
-//             auth_draft.basic_username, auth_draft.basic_password
-//         ),
-//         AuthKind::ApiKey => format!(
-//             "Header: {}\nValue: {}",
-//             auth_draft.api_key_header, auth_draft.api_key_value
-//         ),
-//         AuthKind::None => "(no authentication)".to_string(),
-//     };
-//     let title = match app.auth_kind {
-//         AuthKind::Bearer => "Bearer Token",
-//         AuthKind::Basic => "Basic Auth",
-//         AuthKind::ApiKey => "API Key",
-//         AuthKind::None => "No Auth",
-//     };
-//
-//     frame.render_widget(
-//         Paragraph::new(auth_text)
-//             .style(Style::default().fg(Color::White))
-//             .block(Block::default().borders(Borders::ALL).title(title)),
-//         area,
-//     );
-// }
 fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
     let auth_draft = app.auth_draft.clone();
     match app.auth_kind {
@@ -408,57 +380,29 @@ fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
                         Span::styled("Key", Style::default().bold()),
                         Span::styled("Value", Style::default().bold()),
                     ]))
-                    .block(Block::default())
+                    .block(Block::default().borders(Borders::ALL).title(auth_tab_menu(app)))
                     .widths(&[Constraint::Length(20), Constraint::Min(0)])
                     .row_highlight_style(Style::new().on_black().bold())
                     .column_highlight_style(Color::Gray)
                     .cell_highlight_style(Style::new().reversed().yellow())
                     .highlight_symbol("> ");
             frame.render_widget(table, area);
-
-            // frame.render_widget(
-            //     table
-            //         .header(ratatui::widgets::Row::new(vec![
-            //             Span::styled("Key", Style::default().bold()),
-            //             Span::styled("Value", Style::default().bold()),
-            //         ]))
-            //         .block(Block::default())
-            //         .widths(&[Constraint::Length(20), Constraint::Min(0)])
-            //         .row_highlight_style(Style::new().on_black().bold())
-            //         .column_highlight_style(Color::Gray)
-            //         .cell_highlight_style(Style::new().reversed().yellow())
-            //         .highlight_symbol("> "),
-            //     area,
-            // );
         }
-        // AuthKind::Basic => format!(
-        //     "Username: {}\nPassword: {}",
-        //     auth_draft.basic_username, auth_draft.basic_password
-        // ),
         AuthKind::Basic => {
             let rows = vec![
-                ratatui::widgets::Row::new(vec!["Username", auth_draft.basic_username.as_str()]),
-                ratatui::widgets::Row::new(vec!["Password", auth_draft.basic_password.as_str()]),
+                ratatui::widgets::Row::new(vec!["Username:", auth_draft.basic_username.as_str()]),
+                ratatui::widgets::Row::new(vec!["Password:", auth_draft.basic_password.as_str()]),
             ];
             let table =
                 ratatui::widgets::Table::new(rows, [Constraint::Length(20), Constraint::Min(0)])
-                    .header(ratatui::widgets::Row::new(vec![
-                        Span::styled("Key", Style::default().bold()),
-                        Span::styled("Value", Style::default().bold()),
-                    ]))
-                    .block(Block::default())
+                    .block(Block::default().borders(Borders::ALL).title(auth_tab_menu(app)))
                     .widths(&[Constraint::Length(20), Constraint::Min(0)])
                     .row_highlight_style(Style::new().on_black().bold())
                     .column_highlight_style(Color::Gray)
                     .cell_highlight_style(Style::new().reversed().yellow())
                     .highlight_symbol("> ");
-            // ratatui::widgets::Table::new(rows, [Constraint::Length(20), Constraint::Min(0)]);
             frame.render_stateful_widget(table, area, &mut app.auth_basic_table_state.clone());
         }
-        // AuthKind::ApiKey => format!(
-        //     "Header: {}\nValue: {}",
-        //     auth_draft.api_key_header, auth_draft.api_key_value
-        // ),
         AuthKind::ApiKey => {
             let rows = vec![
                 ratatui::widgets::Row::new(vec!["Header", auth_draft.api_key_header.as_str()]),
@@ -470,7 +414,7 @@ fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
                         Span::styled("Key", Style::default().bold()),
                         Span::styled("Value", Style::default().bold()),
                     ]))
-                    .block(Block::default())
+                    .block(Block::default().borders(Borders::ALL).title(auth_tab_menu(app)))
                     .widths(&[Constraint::Length(20), Constraint::Min(0)])
                     .row_highlight_style(Style::new().on_black().bold())
                     .column_highlight_style(Color::Gray)
@@ -478,7 +422,6 @@ fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
                     .highlight_symbol("> ");
             frame.render_widget(table, area);
         }
-        // AuthKind::None => "(no authentication)".to_string(),
         AuthKind::None => {
             let rows = vec![ratatui::widgets::Row::new(vec!["", "(no authentication)"])];
             let table =
@@ -487,7 +430,7 @@ fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
                         Span::styled("Key", Style::default().bold()),
                         Span::styled("Value", Style::default().bold()),
                     ]))
-                    .block(Block::default())
+                    .block(Block::default().borders(Borders::ALL).title(auth_tab_menu(app)))
                     .widths(&[Constraint::Length(20), Constraint::Min(0)])
                     .row_highlight_style(Style::new().on_black().bold())
                     .column_highlight_style(Color::Gray)
@@ -525,6 +468,33 @@ fn render_auth_tab(frame: &mut Frame, app: &App, area: Rect) {
     //         .block(Block::default().borders(Borders::ALL).title(title)),
     //     area,
     // );
+}
+
+fn auth_tab_menu(app: &App) -> Vec<Span> {
+    let mut menu = Vec::new();
+    let auth_kinds = vec![
+        AuthKind::Bearer,
+        AuthKind::Basic,
+        AuthKind::ApiKey,
+        AuthKind::None,
+    ];
+
+    for kind in auth_kinds {
+        let style = if app.auth_kind == kind {
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+        let label = match kind {
+            AuthKind::Bearer => "Bearer Token",
+            AuthKind::Basic => "Basic Auth",
+            AuthKind::ApiKey => "API Key",
+            AuthKind::None => "No Auth",
+        };
+        menu.push(Span::styled(label, style));
+    }
+
+    menu
 }
 
 fn render_body_tab(frame: &mut Frame, app: &App, area: Rect) {
