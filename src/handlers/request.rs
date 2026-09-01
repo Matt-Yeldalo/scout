@@ -87,11 +87,12 @@ impl App {
                 }
                 _ => {}
             },
+                // AuthKind::Bearer AuthKind::Basic AuthKind::ApiKey AuthKind::None 
             RequestTab::Auth => match self.auth_kind {
-                AuthKind::Bearer => self.update_auth_kind(AuthKind::Basic),
-                AuthKind::Basic => self.update_auth_kind(AuthKind::ApiKey),
-                AuthKind::ApiKey => self.update_auth_kind(AuthKind::None),
-                AuthKind::None => self.update_auth_kind(AuthKind::Bearer),
+                AuthKind::Bearer => self.update_auth_kind(AuthKind::None),
+                AuthKind::Basic => self.update_auth_kind(AuthKind::Bearer),
+                AuthKind::ApiKey => self.update_auth_kind(AuthKind::Basic),
+                AuthKind::None => self.update_auth_kind(AuthKind::ApiKey),
             },
             _ => {}
         }
@@ -110,10 +111,10 @@ impl App {
                 _ => {}
             },
             RequestTab::Auth => match self.auth_kind {
-                AuthKind::Bearer => self.update_auth_kind(AuthKind::None),
-                AuthKind::Basic => self.update_auth_kind(AuthKind::Bearer),
-                AuthKind::ApiKey => self.update_auth_kind(AuthKind::Basic),
-                AuthKind::None => self.update_auth_kind(AuthKind::ApiKey),
+                AuthKind::Bearer => self.update_auth_kind(AuthKind::Basic),
+                AuthKind::Basic => self.update_auth_kind(AuthKind::ApiKey),
+                AuthKind::ApiKey => self.update_auth_kind(AuthKind::None),
+                AuthKind::None => self.update_auth_kind(AuthKind::Bearer),
             },
             _ => {}
         }
