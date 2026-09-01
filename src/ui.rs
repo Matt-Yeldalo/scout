@@ -3,7 +3,7 @@ use crate::request::{AuthKind, HttpMethod};
 use crate::toolbar::toolbar_hints;
 use ratatui::layout::Margin;
 use ratatui::style::Stylize;
-use ratatui::widgets::{Padding, Scrollbar, ScrollbarOrientation};
+use ratatui::widgets::{Clear, Padding, Scrollbar, ScrollbarOrientation};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
@@ -58,6 +58,7 @@ pub fn render(frame: &mut Frame, app: &App) -> UiDimensions {
     render_notifier(frame, app, notifier_area);
     render_toolbar(frame, app, toolbar);
     render_error(frame, app);
+    render_help(frame, app);
 
     UiDimensions {
         collections_area: sidebar_area,
@@ -66,6 +67,100 @@ pub fn render(frame: &mut Frame, app: &App) -> UiDimensions {
         notifier_area,
         toolbar_area: toolbar,
     }
+}
+
+fn render_help(frame: &mut Frame, app: &App) {
+    if !app.show_help {
+        return;
+    }
+
+    let area = popup_area(Frame::area(&frame), 65, 88);
+    frame.render_widget(Clear, area);
+
+    let key_style = Style::default()
+        .fg(Color::Cyan)
+        .add_modifier(Modifier::BOLD);
+    let desc_style = Style::default().fg(Color::White);
+    let header_style = Style::default()
+        .fg(Color::Yellow)
+        .add_modifier(Modifier::BOLD);
+    let note_style = Style::default().fg(Color::DarkGray);
+
+    let section =
+        |title: &'static str| -> Line<'static> { Line::from(Span::styled(title, header_style)) };
+    let row = |key: &'static str, desc: &'static str| -> Line<'static> {
+        Line::from(vec![
+            Span::styled(format!("  {:<20}", key), key_style),
+            Span::styled(desc, desc_style),
+        ])
+    };
+    let note = |text: &'static str| -> Line<'static> {
+        Line::from(Span::styled(format!("  {}", text), note_style))
+    };
+
+    let lines: Vec<Line> = vec![
+        section(" Navigation"),
+        row(
+            "[Tab]",
+            "Cycle focus  Collections → Request → Response → Variables",
+        ),
+        row("[h]", "Toggle this help"),
+        row("[q]", "Quit"),
+        Line::default(),
+        section(" Collections"),
+        row("[k] / [j]", "Navigate up / down"),
+        row("[Enter]", "Open collection  or  load request into builder"),
+        row("[n]", "New collection"),
+        row("[a]", "Save active request to selected collection"),
+        row("[i]", "Edit collection or request name"),
+        row("[Left]", "Back to collection list from request list"),
+        row("[s]", "Save all collections to disk"),
+        Line::default(),
+        section(" Request Builder"),
+        row(
+            "[h] / [l]",
+            "Previous / next tab  (URL · Headers · Body · Auth)",
+        ),
+        row("[m]", "Toggle method  GET <-> POST"),
+        row("[s]", "Send request"),
+        row("[i]", "Edit  (URL / header field / body / auth field)"),
+        row("[a]", "Add header row  (Headers tab)"),
+        row(
+            "[Left] / [Right]",
+            "Cycle auth type  (Auth tab)  or  key/value col  (Headers)",
+        ),
+        row("[Up] / [Down]", "Switch auth field  (Auth tab)"),
+        Line::default(),
+        section(" Response"),
+        row("[k] / [j]", "Scroll up / down"),
+        row("[y]", "Copy response body to clipboard"),
+        Line::default(),
+        section(" Variables"),
+        row("[k] / [j]", "Navigate rows"),
+        row("[h] / [l]", "Switch column  (key <-> value)"),
+        row("[i]", "Edit selected cell"),
+        row("[a]", "Add new variable row"),
+        row("[Delete]", "Remove selected row"),
+        row("[s]", "Save  (switch to Collections panel first)"),
+        Line::default(),
+        section(" Using Variables"),
+        note("Variables belong to a collection and are substituted into the URL when sending."),
+        Line::default(),
+        row("$NAME", "simple reference  e.g.  $base_url/users"),
+        row("${NAME}", "explicit reference  e.g.  ${base_url}/users"),
+        row(
+            "${NAME:default}",
+            "with fallback if the variable is not set",
+        ),
+    ];
+
+    let block = Block::default()
+        .title(" Help ")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Yellow));
+
+    frame.render_widget(Paragraph::new(lines).block(block), area);
 }
 
 fn render_error(frame: &mut Frame, app: &App) {
@@ -123,6 +218,16 @@ fn focused_block(title: &str, focused: bool) -> Block<'_> {
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(border_style)
+}
+
+fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
+    let vertical =
+        Layout::vertical([Constraint::Percentage(percent_y)]).flex(ratatui::layout::Flex::Center);
+    let horizontal =
+        Layout::horizontal([Constraint::Percentage(percent_x)]).flex(ratatui::layout::Flex::Center);
+    let [area] = vertical.areas(area);
+    let [area] = horizontal.areas(area);
+    area
 }
 
 // ---------------------------------------------------------------------------

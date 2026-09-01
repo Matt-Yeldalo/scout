@@ -12,6 +12,7 @@ pub fn toolbar_hints(app: &App) -> String {
                             "[i] edit collection",
                             "[s] save",
                             "[q] quit",
+                            "[h] toggle help",
                         ]
                     }
                     CollectionState::RequestList(_) => {
@@ -25,6 +26,7 @@ pub fn toolbar_hints(app: &App) -> String {
                             "[i] edit request",
                             "[s] save",
                             "[q] quit",
+                            "[h] toggle help",
                         ]
                     }
                 },
@@ -39,6 +41,7 @@ pub fn toolbar_hints(app: &App) -> String {
                             "[m] method",
                             "[s] send",
                             "[q] quit",
+                            "[h] toggle help",
                         ]
                     }
                     _ => {
@@ -49,6 +52,7 @@ pub fn toolbar_hints(app: &App) -> String {
                             "[m] method",
                             "[s] send",
                             "[q] quit",
+                            "[h] toggle help",
                         ]
                     }
                 },
@@ -59,6 +63,7 @@ pub fn toolbar_hints(app: &App) -> String {
                         "[y] copy response",
                         "[s] send",
                         "[q] quit",
+                        "[h] toggle help",
                     ]
                 }
                 Focus::Variables => {
@@ -69,6 +74,7 @@ pub fn toolbar_hints(app: &App) -> String {
                         "[a] add row",
                         "[s] save",
                         "[q] quit",
+                        "[h] toggle help",
                     ]
                 }
             }
