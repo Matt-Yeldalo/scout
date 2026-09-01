@@ -108,6 +108,23 @@ impl Request {
             id: uuid::Uuid::new_v4().to_string(),
         }
     }
+
+    pub fn populate_placeholders(&mut self, variables: &HashMap<String, String>) -> Result<(), String> {
+        let url = self.url.as_str();
+        let variables = variables.clone();
+        let url = subst::substitute(&url, &variables);
+        match url {
+            Ok(u) => {
+                self.url = u;
+                Ok(())
+            }
+            _ => Err("Failed to populate placeholders".to_string()),
+        }
+        // for (key, value) in variables {
+        //     let placeholder = format!("{{{{{}}}}}", key);
+        //     self.url = self.url.replace(&placeholder, value);
+        // }
+    }
 }
 
 impl std::fmt::Display for Request {

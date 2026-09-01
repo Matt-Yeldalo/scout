@@ -208,7 +208,21 @@ impl App {
 
     pub fn handle_send_request(&mut self) {
         self.is_loading = true;
-        let request = self.active_request.clone();
+        let mut request = self.active_request.clone();
+        let populate_result = request.populate_placeholders(
+            &self
+                .get_active_collection()
+                .map(|c| c.variables.iter().cloned().collect())
+                .unwrap_or_default(),
+        );
+        match populate_result {
+            Ok(_) => {}
+            Err(e) => {
+                self.is_loading = false;
+                self.notifier.notify(NotifyType::Error, e);
+                return;
+            }
+        }
         let sender = self.sender.clone();
         tokio::spawn(async move {
             let response = send(request).await.unwrap_or_else(|e| Response {

@@ -1651,6 +1651,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "subst",
  "tokio",
  "tui-textarea",
  "uuid",
@@ -1847,6 +1848,16 @@ dependencies = [
  "quote",
  "rustversion",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "subst"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a9a86e5144f63c2d18334698269a8bfae6eece345c70b64821ea5b35054ec99"
+dependencies = [
+ "memchr",
+ "unicode-width 0.1.14",
 ]
 
 [[package]]
