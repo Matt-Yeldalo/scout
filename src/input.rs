@@ -32,7 +32,7 @@ impl TextInput {
     }
 
     pub fn move_cursor_right(&mut self) {
-        if self.cursor < self.value.len() {
+        if self.cursor <= self.value.len() {
             self.cursor += 1;
         }
     }

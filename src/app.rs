@@ -293,8 +293,14 @@ impl App {
 
     fn handle_normal_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Char('h') => self.show_help = !self.show_help,
-            KeyCode::Char('q') => self.should_quit = true,
+            KeyCode::Char('?') => self.show_help = !self.show_help,
+            KeyCode::Char('q') => {
+                if self.show_help {
+                    self.show_help = false;
+                } else {
+                    self.should_quit = true
+                }
+            }
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.should_quit = true;
             }

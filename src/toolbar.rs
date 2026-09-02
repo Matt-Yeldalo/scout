@@ -12,7 +12,7 @@ pub fn toolbar_hints(app: &App) -> String {
                             "[i] edit collection",
                             "[s] save",
                             "[q] quit",
-                            "[h] toggle help",
+                            "[?] toggle help",
                         ]
                     }
                     CollectionState::RequestList(_) => {
@@ -26,7 +26,7 @@ pub fn toolbar_hints(app: &App) -> String {
                             "[i] edit request",
                             "[s] save",
                             "[q] quit",
-                            "[h] toggle help",
+                            "[?] toggle help",
                         ]
                     }
                 },
@@ -41,7 +41,7 @@ pub fn toolbar_hints(app: &App) -> String {
                             "[m] method",
                             "[s] send",
                             "[q] quit",
-                            "[h] toggle help",
+                            "[?] toggle help",
                         ]
                     }
                     _ => {
@@ -52,7 +52,7 @@ pub fn toolbar_hints(app: &App) -> String {
                             "[m] method",
                             "[s] send",
                             "[q] quit",
-                            "[h] toggle help",
+                            "[?] toggle help",
                         ]
                     }
                 },
@@ -63,10 +63,16 @@ pub fn toolbar_hints(app: &App) -> String {
                         "[y] copy response",
                         "[s] send",
                         "[q] quit",
-                        "[h] toggle help",
+                        "[?] toggle help",
                     ]
                 }
                 Focus::Variables => {
+                    // let selected_field = app.variables_table_state.selected();
+                    // let selected_field = match selected_field {
+                    //     Some(0) => app
+                    //     None => String::new(),
+                    // };
+
                     vec![
                         "[tab] cycle focus",
                         "[k/j] up/down",
@@ -74,7 +80,7 @@ pub fn toolbar_hints(app: &App) -> String {
                         "[a] add row",
                         "[s] save",
                         "[q] quit",
-                        "[h] toggle help",
+                        "[?] toggle help",
                     ]
                 }
             }

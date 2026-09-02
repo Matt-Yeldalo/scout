@@ -51,8 +51,8 @@ pub fn render(frame: &mut Frame, app: &App) -> UiDimensions {
 
     render_request_builder(frame, app, builder_area);
 
-    render_response(frame, app, response_area);
-    // render_debug_info(frame, app, response_area);
+    // render_response(frame, app, response_area);
+    render_debug_info(frame, app, response_area);
     render_vertical_scrollbar(frame, response_area, &mut response_scrollbar);
 
     render_notifier(frame, app, notifier_area);

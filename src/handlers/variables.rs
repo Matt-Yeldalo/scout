@@ -13,10 +13,23 @@ impl App {
             KeyCode::Char('h') | KeyCode::Left => self.move_left(),
             KeyCode::Char('i') => {
                 self.input_mode = InputMode::Insert;
-                let current_key = self.current_key().unwrap_or_default();
-                self.active_input.value = current_key;
-                self.active_input.cursor = self.active_input.value.len();
-                self.edit_context = EditContext::VariableKey
+                match self.edit_context {
+                    EditContext::VariableKey => {
+                        let current_key = self.current_key().unwrap_or_default();
+                        self.active_input.value = current_key;
+                        self.active_input.cursor = self.active_input.value.len();
+                    }
+                    EditContext::VariableValue => {
+                        let current_value = self.current_value().unwrap_or_default();
+                        self.active_input.value = current_value;
+                        self.active_input.cursor = self.active_input.value.len();
+                    }
+                    _ => {}
+                }
+                // let current_key = self.current_key().unwrap_or_default();
+                // self.active_input.value = current_key;
+                // self.active_input.cursor = self.active_input.value.len();
+                // self.edit_context = EditContext::VariableKey
             }
             KeyCode::Char('a') => {
                 self.input_mode = InputMode::Insert;
@@ -54,6 +67,28 @@ impl App {
                 self.input_mode = InputMode::Normal;
                 self.edit_context = EditContext::VariableKey;
                 self.active_input.value.clear();
+                let variables = self.variables();
+                let last_index = variables.len().checked_sub(1);
+                let last_row = variables.get(last_index.unwrap_or(0));
+                match last_row {
+                    Some((k, v)) => {
+                        if k.is_empty() && v.is_empty() {
+                            return;
+                        }
+                        if let Some(i) = self.variables_table_state.selected() {
+                            if let Some(c) = self.get_active_collection_mut() {
+                                c.variables.remove(i);
+                                let new_selection = if i >= c.variables.len() {
+                                    c.variables.len().checked_sub(1)
+                                } else {
+                                    Some(i)
+                                };
+                                self.variables_table_state.select(new_selection);
+                            }
+                        }
+                    }
+                    _ => {}
+                };
             }
             KeyCode::Enter => {
                 if let Some(_) = self.variables_table_state.selected() {
