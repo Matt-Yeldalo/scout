@@ -177,22 +177,24 @@ impl App {
         let Some(i) = self.variables_table_state.selected() else {
             return;
         };
-        let Some(c) = self.get_active_collection_mut() else {
+        let mut collection = self.get_active_collection_mut();
+        // let Some(c) = self.get_active_collection_mut() else {
+        //     return;
+        // };
+        let Some(c) = collection.as_mut() else {
             return;
         };
-        // let old_key = self.variables()[i].0.clone();
-        let mut key = self.current_key().unwrap_or_default();
-        key.clone_from(&new_key);
-        // if c.variables.contains() {
-        //     self.notifier.notify(
-        //         NotifyType::Warning,
-        //         "Key already exists, please choose a different key.".to_string(),
-        //     );
-        // } else {
-        //     if let Some(value) = c.variables.remove(&old_key) {
-        //         c.variables.insert(new_key, value);
-        //     }
-        // }
+        let old_key = c.variables[i].0.clone();
+        // let mut key = self.current_key().unwrap_or_default();
+        // key.clone_from(&new_key);
+        if old_key != new_key {
+            if c.variables.iter().any(|(k, _)| k == &new_key) {
+                self.notifier
+                    .notify(NotifyType::Error, "Key already exists".to_string());
+                return;
+            }
+            c.variables[i].0 = new_key;
+        }
     }
 
     fn current_variable(&mut self) -> Option<(String, String)> {

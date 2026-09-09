@@ -1,5 +1,3 @@
-
-
 use crate::{
     app::{App, Collection, CollectionState, Focus, InputMode, RequestTab},
     request::{Auth, AuthDraft},
@@ -21,25 +19,25 @@ impl App {
                 // TODO: message to user - need to think about generic way to do this
                 // this will be used for other messages as well, like errors, etc.
             }
-            KeyCode::Char('a') => {
-                if let Some(selected_collection) = self.collection_list_state.selected() {
-                    if let Some(collection) = self.collections.get_mut(selected_collection) {
+            // KeyCode::Char('a') => {
+            //     if let Some(selected_collection) = self.collection_list_state.selected() {
+            //         if let Some(collection) = self.collections.get_mut(selected_collection) {
+            //             collection.requests.push(self.active_request.clone());
+            //         }
+            //     }
+            // }
+            KeyCode::Char('a') => match self.collection_ui_state {
+                CollectionState::RequestList(collection_index) => {
+                    if let Some(collection) = self.collections.get_mut(collection_index) {
                         collection.requests.push(self.active_request.clone());
                     }
                 }
-            }
-            KeyCode::Char('n') => {
-                let id = Uuid::new_v4().to_string();
-                // TODO: add default to collection
-                self.collections.push(Collection {
-                    id,
-                    name: "New Collection".to_string(),
-                    requests: Vec::new(),
-                    variables: Vec::new(),
-                });
-                self.input_mode = InputMode::Insert;
-                self.update_collection_list_state(Some(self.collections.len() - 1));
-            }
+                _ => {}
+            },
+            KeyCode::Char('n') => match self.collection_ui_state {
+                CollectionState::CollectionList => self.add_new_collection(),
+                _ => {}
+            },
             KeyCode::Left => match self.collection_ui_state {
                 CollectionState::RequestList(_) => {
                     self.collection_ui_state = CollectionState::CollectionList;
@@ -165,6 +163,18 @@ impl App {
                 _ => {}
             },
         }
+    }
+
+    fn add_new_collection(&mut self) {
+        let id = Uuid::new_v4().to_string();
+        self.collections.push(Collection {
+            id,
+            name: "New Collection".to_string(),
+            requests: Vec::new(),
+            variables: Vec::new(),
+        });
+        self.input_mode = InputMode::Insert;
+        self.update_collection_list_state(Some(self.collections.len() - 1));
     }
 
     fn update_collection_list_state(&mut self, collection_index: Option<usize>) {

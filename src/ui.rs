@@ -1,4 +1,4 @@
-use crate::app::{App, CollectionState, EditContext, Focus, InputMode, RequestTab};
+use crate::app::{App, BusyReason, CollectionState, EditContext, Focus, InputMode, RequestTab};
 use crate::request::{AuthKind, HttpMethod};
 use crate::toolbar::toolbar_hints;
 use ratatui::layout::Margin;
@@ -26,7 +26,7 @@ pub fn render(frame: &mut Frame, app: &App) -> UiDimensions {
     // `Length(1)` takes exactly 1 row. `Min(0)` takes all remaining rows.
     let [main_area, notifier_area, toolbar] = Layout::vertical([
         Constraint::Min(0),
-        Constraint::Length(if app.notifier.ready() { 1 } else { 0 }),
+        Constraint::Length(1),
         Constraint::Length(1),
     ])
     .areas(frame.area());
@@ -408,7 +408,10 @@ fn render_url_tab(frame: &mut Frame, app: &App, area: Rect) {
         (url_str, Style::default().fg(Color::White))
     };
 
-    if app.input_mode == InputMode::Insert && app.active_tab == RequestTab::Url {
+    if app.input_mode == InputMode::Insert
+        && app.focus == Focus::RequestBuilder
+        && app.active_tab == RequestTab::Url
+    {
         let spans = url_str
             .chars()
             .enumerate()
@@ -819,10 +822,39 @@ fn highlighted_variable_field(current_index: usize, value: &String) -> Line {
 // Notifier
 // ---------------------------------------------------------------------------
 fn render_notifier(frame: &mut Frame, app: &App, area: Rect) {
+    let notify_area = Rect {
+        x: area.x + 20,
+        y: area.y,
+        width: area.width - 20,
+        height: 1,
+    };
+    let spinner_char = app.get_spinner();
+    let spinner_area = Rect {
+        x: area.x,
+        y: area.y,
+        width: 20,
+        height: 1,
+    };
+
+    let spinner_text = if app.is_loading {
+        match app.busy {
+            Some(BusyReason::Saving) => format!("{} Saving…", spinner_char),
+            Some(BusyReason::SendingRequest) => format!("{} Sending…", spinner_char),
+            _ => "".to_string(),
+        }
+    } else {
+        "".to_string()
+    };
+    let spinner_paragraph = Paragraph::new(spinner_text)
+        .style(Style::default().fg(Color::Yellow))
+        .block(Block::default().borders(Borders::NONE));
+
     frame.render_widget(
         Paragraph::new(app.notifier.display()).style(app.notifier.style()),
-        area,
+        notify_area,
     );
+
+    frame.render_widget(spinner_paragraph, spinner_area);
 }
 
 // ---------------------------------------------------------------------------
@@ -867,7 +899,7 @@ fn render_debug_info(frame: &mut Frame, app: &App, area: Rect) {
         //  response: {:?}\n
         //  selected_header_row: {:?}\tediting_header_field: {:?}\theaders_table_selected: {:?}\n
         //  collection_ui_state: {:?}",
-        "focus: {:?} | tab: {:?} | mode: {:?}\nresponse: {:?}\nselected_header_row: {:?} | editing_header_field: {:?} | headers_table_selected: {:?}\ncollection_ui_state: {:?}\nauth_kind: {:?}\nauth_draft: {:?}\nediting_auth_field: {:?}\nactive_input.value: {:?}\nactive_input.cursor: {:?}\nvariables_table_selected: {:?}\nedit_context: {:?}",
+        "focus: {:?} | tab: {:?} | mode: {:?}\nresponse: {:?}\nselected_header_row: {:?} | editing_header_field: {:?} | headers_table_selected: {:?}\ncollection_ui_state: {:?} | selected_collection: {:?}\nauth_kind: {:?}\nauth_draft: {:?}\nediting_auth_field: {:?}\nactive_input.value: {:?}\nactive_input.cursor: {:?}\nvariables_table_selected: {:?}\nedit_context: {:?} | busy: {:?} | dirty: {:?} | last_edit: {:?}\nspinner: {:?}",
         app.focus,
         app.active_tab,
         app.input_mode,
@@ -876,13 +908,18 @@ fn render_debug_info(frame: &mut Frame, app: &App, area: Rect) {
         app.editing_header_field.as_ref(),
         app.headers_table_state.selected(),
         app.collection_ui_state,
+        app.collection_list_state.selected(),
         app.auth_kind,
         app.auth_draft,
         app.editing_auth_field.as_ref(),
         app.active_input.value,
         app.active_input.cursor,
         app.variables_table_state.selected(),
-        app.edit_context
+        app.edit_context,
+        app.busy,
+        app.dirty,
+        app.last_edit,
+        app.get_spinner()
     );
 
     let debug_area = Rect {

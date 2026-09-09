@@ -2,12 +2,12 @@ mod app;
 mod event;
 mod handlers;
 mod http;
+mod input;
 mod local_store;
 mod notifier;
 mod request;
 mod toolbar;
 mod ui;
-mod input;
 
 use crate::{event::AppEvent, ui::UiDimensions};
 use anyhow::Result;
@@ -64,10 +64,11 @@ async fn run(
 ) -> Result<()> {
     let mut event_stream = crossterm::event::EventStream::new();
     let mut last_dimenions = UiDimensions::default();
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(100));
     loop {
         terminal.draw(|frame| last_dimenions = ui::render(frame, &app))?;
 
-        let event = event::next(receiver, &mut event_stream).await?;
+        let event = event::next(receiver, &mut event_stream, &mut interval).await?;
         app.ui_dimensions = last_dimenions.clone();
         app.update(event);
 

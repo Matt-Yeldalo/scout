@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{
     event::AppEvent,
     http::send,
@@ -13,7 +15,20 @@ use crate::{
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::{ListState, ScrollbarState, TableState};
 use serde::{Deserialize, Serialize};
+use tokio::time::Instant;
 use tui_textarea::TextArea;
+
+// static SPINNER_FRAMES: &[&char] = &['⠋', '⠙', "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+static SPINNER_FRAMES: &[char] = &['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+static NON_DIRTY_KEYS: &[KeyCode] = &[
+    KeyCode::Esc,
+    KeyCode::Tab,
+    KeyCode::BackTab,
+    KeyCode::Up,
+    KeyCode::Down,
+    KeyCode::Left,
+    KeyCode::Right,
+];
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum EditContext {
@@ -94,6 +109,12 @@ pub enum HeaderField {
     Value,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum BusyReason {
+    SendingRequest,
+    Saving,
+}
+
 pub struct App {
     pub local_store: LocalStore,
     pub debug: bool,
@@ -130,6 +151,10 @@ pub struct App {
     pub auth_basic_table_state: TableState,
     pub edit_context: EditContext,
     pub active_input: TextInput,
+    pub busy: Option<BusyReason>,
+    pub dirty: bool,
+    pub last_edit: Instant,
+    pub spinner_index: usize,
 }
 
 impl App {
@@ -204,6 +229,10 @@ impl App {
             ui_dimensions: UiDimensions::default(),
             variables_table_state: TableState::default(),
             active_input: TextInput::new(),
+            dirty: false,
+            last_edit: Instant::now(),
+            spinner_index: 0,
+            busy: None,
         }
     }
 
@@ -239,6 +268,18 @@ impl App {
 
     pub fn update(&mut self, event: AppEvent) {
         match event {
+            AppEvent::Tick => {
+                self.increment_spinner();
+                if self.is_ready_for_save() {
+                    let result = self.save();
+                    if let Err(e) = result {
+                        self.notifier
+                            .notify(NotifyType::Error, format!("Failed to save request: {}", e));
+                    } else {
+                        self.dirty = false;
+                    }
+                }
+            }
             AppEvent::Mouse(mouse_event) => self.handle_mouse_event(mouse_event),
             AppEvent::Key(key) => self.handle_key(key),
             AppEvent::HttpResponse(response) => {
@@ -320,6 +361,9 @@ impl App {
     }
 
     fn handle_insert_key(&mut self, key: KeyEvent) {
+        if !NON_DIRTY_KEYS.contains(&key.code) {
+            self.set_dirty_status();
+        }
         match self.focus {
             Focus::Collections => self.handle_collections_insert(key),
             Focus::RequestBuilder => self.handle_request_builder_insert(key),
@@ -329,12 +373,47 @@ impl App {
     }
 
     pub fn get_active_collection(&self) -> Option<&Collection> {
-        self.collections.get(self.active_collection.unwrap_or(0))
+        self.collections
+            .get(self.collection_list_state.selected().unwrap_or(0))
     }
 
     pub fn get_active_collection_mut(&mut self) -> Option<&mut Collection> {
-        let index = self.active_collection.unwrap_or(0);
+        // let index = self.active_collection.unwrap_or(0);
+        let index = self.collection_list_state.selected().unwrap_or(0);
         self.collections.get_mut(index)
+    }
+
+    pub fn save(&mut self) -> Result<(), String> {
+        self.busy = Some(BusyReason::Saving);
+        self.update_request();
+        let result = self.local_store.save_all(self.collections.clone());
+        self.busy = None;
+        result
+    }
+
+    fn is_ready_for_save(&self) -> bool {
+        self.dirty && self.last_edit.elapsed() > Duration::from_millis(800)
+    }
+
+    fn increment_spinner(&mut self) {
+        self.spinner_index = (self.spinner_index + 1) % 4;
+    }
+
+    pub fn get_spinner(&self) -> char {
+        SPINNER_FRAMES[self.spinner_index % SPINNER_FRAMES.len()]
+
+        // match self.spinner_index {
+        //     0 => '⠋',
+        //     1 => '⠙',
+        //     2 => '⠹',
+        //     3 => '⠸',
+        //     _ => ' ',
+        // }
+    }
+
+    pub fn set_dirty_status(&mut self){
+        self.dirty = true;
+        self.last_edit = Instant::now();
     }
 
     fn tab_changed_callback(&mut self) {

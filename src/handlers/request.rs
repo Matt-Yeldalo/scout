@@ -3,6 +3,7 @@ use crate::{
     request::{Auth, AuthDraft, AuthKind, HttpMethod},
 };
 use crossterm::event::{KeyCode, KeyEvent};
+use tokio::time::Instant;
 use tui_textarea::{CursorMove, TextArea};
 
 impl App {

@@ -9,6 +9,7 @@ pub fn toolbar_hints(app: &App) -> String {
                         vec![
                             "[tab] cycle focus",
                             "[k/j] up/down",
+                            "[n] new collection",
                             "[i] edit collection",
                             "[s] save",
                             "[q] quit",
@@ -23,6 +24,7 @@ pub fn toolbar_hints(app: &App) -> String {
                             "[tab] cycle focus",
                             "[k/j] up/down",
                             "[←] collections",
+                            "[a] add request",
                             "[i] edit request",
                             "[s] save",
                             "[q] quit",
