@@ -93,12 +93,8 @@ impl App {
             KeyCode::Enter => {
                 if let Some(_) = self.variables_table_state.selected() {
                     match self.edit_context {
-                        EditContext::VariableKey => {
-                            self.update_key(self.active_input.value.clone())
-                        }
-                        EditContext::VariableValue => {
-                            self.update_value(self.active_input.value.clone())
-                        }
+                        EditContext::VariableKey => self.update_key(self.active_input.value.clone()), 
+                        EditContext::VariableValue =>  self.update_value(self.active_input.value.clone()),
                         _ => {}
                     }
                 }

@@ -762,6 +762,7 @@ fn render_variables(frame: &mut Frame, app: &App, area: Rect) {
             // Span::styled(v.0, Style::default().fg(Color::Cyan))
             Line::from(Span::styled(v.0, Style::default().fg(Color::Cyan)))
         };
+
         let value = if is_editing_variable_field(&app, EditContext::VariableValue, i) {
             // Span::styled(&app.active_input.value, Style::default().fg(Color::Yellow))
             highlighted_variable_field(i, &app.active_input.value)
@@ -794,6 +795,14 @@ fn render_variables(frame: &mut Frame, app: &App, area: Rect) {
         variables_area,
         &mut app.variables_table_state.clone(),
     );
+}
+
+fn variable_style_map(app: &App, active: bool) -> (Style) {
+    if active {
+        (Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+    } else {
+        (Style::default().fg(Color::Cyan))
+    }
 }
 
 fn is_editing_variable_field(app: &App, edit_context: EditContext, row: usize) -> bool {

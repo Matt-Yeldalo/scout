@@ -1,12 +1,7 @@
 use std::time::Duration;
 
 use crate::{
-    event::AppEvent,
-    http::send,
-    input::TextInput,
-    notifier::{Notifier, NotifyType},
-    request::{AuthDraft, AuthKind},
-    ui::UiDimensions,
+    config::Config, event::AppEvent, http::send, input::TextInput, notifier::{Notifier, NotifyType}, request::{AuthDraft, AuthKind}, ui::UiDimensions
 };
 use crate::{
     local_store::{LocalStore, StoreKey},
@@ -155,6 +150,7 @@ pub struct App {
     pub dirty: bool,
     pub last_edit: Instant,
     pub spinner_index: usize,
+    pub config: Config
 }
 
 impl App {
@@ -165,6 +161,20 @@ impl App {
         let mut auth_basic_table_state = TableState::default();
         auth_basic_table_state.select_first();
         auth_basic_table_state.select_last_column();
+
+        let config = confy::load("scout", None).unwrap_or_else(|e| {
+            eprintln!("Failed to load config: {}", e);
+            Config::default()
+        });
+        let config = config.clone();
+
+        // let config = match confy::load("scout", None) {
+        //     Ok(config) => config,
+        //     Err(e) => {
+        //         eprintln!("Failed to load config: {}", e);
+        //         Config::default()
+        //     }
+        // };
 
         let local_store = LocalStore::new();
         let mut notifier = Notifier::default();
@@ -202,7 +212,8 @@ impl App {
             collection_list_state,
             clipboard,
             notifier,
-            debug: true,
+            config,
+            debug: config.debug,
             should_quit: false,
             is_loading: false,
             show_help: false,
@@ -270,7 +281,7 @@ impl App {
         match event {
             AppEvent::Tick => {
                 self.increment_spinner();
-                if self.is_ready_for_save() {
+                if self.is_ready_for_save() && self.config.autosave {
                     let result = self.save();
                     if let Err(e) = result {
                         self.notifier

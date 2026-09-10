@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.104"
 arboard = "3.6.1"
+confy = "2.0.0"
 crossterm = { version = "0.29", features = ["event-stream"] }
 futures = "0.3.33"
 ratatui = "0.29"
