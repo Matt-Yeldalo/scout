@@ -120,10 +120,6 @@ impl Request {
             }
             _ => Err("Failed to populate placeholders".to_string()),
         }
-        // for (key, value) in variables {
-        //     let placeholder = format!("{{{{{}}}}}", key);
-        //     self.url = self.url.replace(&placeholder, value);
-        // }
     }
 }
 
@@ -139,7 +135,8 @@ impl std::fmt::Display for Request {
         //     "id: {}\nn: {}\nm: {}\nu: {}\nh: {:?}\nb: {:?}\na: {:?}",
         //     self.id, self.name, method, self.url, self.headers, self.body, self.auth
         // )
-        write!(f, "{} {} ({})", method, self.url, self.name)
+        // write!(f, "{} {} ({})", method, self.url, self.name)
+        write!(f, "{} - {}", method, self.name)
     }
 }
 

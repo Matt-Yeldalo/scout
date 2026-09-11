@@ -31,13 +31,13 @@ pub fn render(frame: &mut Frame, app: &App) -> UiDimensions {
     ])
     .areas(frame.area());
 
-    // --- Horizontal split ---
+    // --- sidebar | main area ---
     let [sidebar_area, right_area] =
-        Layout::horizontal([Constraint::Percentage(25), Constraint::Percentage(75)])
+        Layout::horizontal([Constraint::Percentage(18), Constraint::Percentage(82)])
             .areas(main_area);
     // Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(main_area);
 
-    // --- Top and bottm of right panel ---
+    // --- Top and bottom of right panel ---
     let [builder_area, response_area] =
         Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(80)])
             .areas(right_area);
@@ -46,12 +46,11 @@ pub fn render(frame: &mut Frame, app: &App) -> UiDimensions {
     let mut response_scrollbar = app.response_scrollbar.clone();
 
     render_collections(frame, app, sidebar_area);
-    // render_debug_info(frame, app, sidebar_area);
     render_variables(frame, app, sidebar_area);
 
     render_request_builder(frame, app, builder_area);
 
-    // render_response(frame, app, response_area);
+    render_response(frame, app, response_area);
     render_debug_info(frame, app, response_area);
     render_vertical_scrollbar(frame, response_area, &mut response_scrollbar);
 
@@ -412,7 +411,9 @@ fn render_url_tab(frame: &mut Frame, app: &App, area: Rect) {
         && app.focus == Focus::RequestBuilder
         && app.active_tab == RequestTab::Url
     {
-        let spans = url_str
+        let spans = app
+            .active_input
+            .value
             .chars()
             .enumerate()
             .map(|(i, c)| {
@@ -752,26 +753,41 @@ fn render_variables(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
+    let editing_field = |edit_context: EditContext, row: usize| -> bool {
+        app.edit_context == edit_context && app.variables_table_state.selected() == Some(row)
+    };
+
     let mut row_variables = Vec::new();
     for (i, v) in active_collection.unwrap().variables.iter().enumerate() {
         let v = v.clone();
-        let key: Line = if is_editing_variable_field(&app, EditContext::VariableKey, i) {
-            // Span::styled(&app.active_input.value, Style::default().fg(Color::Yellow))
-            highlighted_variable_field(i, &app.active_input.value)
-        } else {
-            // Span::styled(v.0, Style::default().fg(Color::Cyan))
-            Line::from(Span::styled(v.0, Style::default().fg(Color::Cyan)))
-        };
+        let key_style = editing_field(EditContext::VariableKey, i)
+            .then(|| Style::default().fg(Color::Yellow))
+            .unwrap_or_else(|| Style::default().fg(Color::Cyan));
+        let value_style = editing_field(EditContext::VariableValue, i)
+            .then(|| Style::default().fg(Color::Yellow))
+            .unwrap_or_else(|| Style::default().fg(Color::White));
+        let row = [
+            Span::styled(v.0, key_style),
+            Span::styled(v.1, value_style)
+        ];
+        // let key: Line = if is_editing_variable_field(&app, EditContext::VariableKey, i) {
+        //     // Span::styled(&app.active_input.value, Style::default().fg(Color::Yellow))
+        //     highlighted_variable_field(app.active_input.cursor, &app.active_input.value)
+        // } else {
+        //     // Span::styled(v.0, Style::default().fg(Color::Cyan))
+        //     Line::from(Span::styled(v.0, Style::default().fg(Color::Cyan)))
+        // };
+        //
+        // let value = if is_editing_variable_field(&app, EditContext::VariableValue, i) {
+        //     // Span::styled(&app.active_input.value, Style::default().fg(Color::Yellow))
+        //     highlighted_variable_field(app.active_input.cursor, &app.active_input.value)
+        // } else {
+        //     // Span::styled(v.1, Style::default().fg(Color::White))
+        //     Line::from(Span::styled(v.1, Style::default().fg(Color::White)))
+        // };
 
-        let value = if is_editing_variable_field(&app, EditContext::VariableValue, i) {
-            // Span::styled(&app.active_input.value, Style::default().fg(Color::Yellow))
-            highlighted_variable_field(i, &app.active_input.value)
-        } else {
-            // Span::styled(v.1, Style::default().fg(Color::White))
-            Line::from(Span::styled(v.1, Style::default().fg(Color::White)))
-        };
-
-        let row = ratatui::widgets::Row::new(vec![key, value]);
+        // let row = ratatui::widgets::Row::new(vec![key, value]);
+        let row = ratatui::widgets::Row::new(row);
         row_variables.push(row);
     }
     // let variables = active_collection.unwrap().variables.iter().map(|(k, v)| {
@@ -795,14 +811,6 @@ fn render_variables(frame: &mut Frame, app: &App, area: Rect) {
         variables_area,
         &mut app.variables_table_state.clone(),
     );
-}
-
-fn variable_style_map(app: &App, active: bool) -> (Style) {
-    if active {
-        (Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
-    } else {
-        (Style::default().fg(Color::Cyan))
-    }
 }
 
 fn is_editing_variable_field(app: &App, edit_context: EditContext, row: usize) -> bool {

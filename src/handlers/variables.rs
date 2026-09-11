@@ -67,15 +67,10 @@ impl App {
                 self.input_mode = InputMode::Normal;
                 self.edit_context = EditContext::VariableKey;
                 self.active_input.value.clear();
-                let variables = self.variables();
-                let last_index = variables.len().checked_sub(1);
-                let last_row = variables.get(last_index.unwrap_or(0));
-                match last_row {
-                    Some((k, v)) => {
+                // Cancelling an edit on a still-blank row (e.g. one just added with [a]) removes it.
+                if let Some(i) = self.variables_table_state.selected() {
+                    if let Some((k, v)) = self.variables().get(i).cloned() {
                         if k.is_empty() && v.is_empty() {
-                            return;
-                        }
-                        if let Some(i) = self.variables_table_state.selected() {
                             if let Some(c) = self.get_active_collection_mut() {
                                 c.variables.remove(i);
                                 let new_selection = if i >= c.variables.len() {
@@ -87,8 +82,7 @@ impl App {
                             }
                         }
                     }
-                    _ => {}
-                };
+                }
             }
             KeyCode::Enter => {
                 if let Some(_) = self.variables_table_state.selected() {
@@ -165,8 +159,7 @@ impl App {
         let Some(c) = self.get_active_collection_mut() else {
             return;
         };
-        let mut value = self.current_value().unwrap_or_default();
-        value.clone_from(&new_value);
+        c.variables[i].1 = new_value;
     }
 
     fn update_key(&mut self, new_key: String) {

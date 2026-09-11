@@ -30,6 +30,8 @@ impl App {
             KeyCode::Char('i') => match self.active_tab {
                 RequestTab::Url => {
                     self.input_mode = InputMode::Insert;
+                    self.active_input.value = self.active_request.url.clone();
+                    self.active_input.cursor = self.active_input.value.len();
                 }
                 RequestTab::Headers => match self.headers_table_state.selected_column() {
                     Some(0) => self.editing_header_field = Some(HeaderField::Key),
@@ -207,22 +209,23 @@ impl App {
     // Insert Mode
     pub(crate) fn handle_request_builder_insert(&mut self, key: KeyEvent) {
         match self.active_tab {
-            RequestTab::Url => {
-                let url = &mut self.active_request.url;
-                match key.code {
-                    KeyCode::Char(c) => url.push(c),
-                    // NOTE: This may be moved up in the chain depending on what the other
-                    // focus panels need
-                    KeyCode::Enter => {
-                        self.input_mode = InputMode::Normal;
-                        self.update_request();
-                    }
-                    KeyCode::Backspace => {
-                        url.pop();
-                    }
-                    _ => {}
+            RequestTab::Url => match key.code {
+                KeyCode::Char(c) => self.active_input.insert(c),
+                KeyCode::Backspace => self.active_input.delete(),
+                KeyCode::Left => self.active_input.move_cursor_left(),
+                KeyCode::Right => self.active_input.move_cursor_right(),
+                // NOTE: This may be moved up in the chain depending on what the other
+                // focus panels need
+                KeyCode::Enter => {
+                    self.active_request.url = self.active_input.value.clone();
+                    self.input_mode = InputMode::Normal;
+                    self.update_request();
                 }
-            }
+                KeyCode::Esc => {
+                    self.input_mode = InputMode::Normal;
+                }
+                _ => {}
+            },
             RequestTab::Headers => self.handle_insert_header(key),
             RequestTab::Body => self.handle_insert_body(key),
             RequestTab::Auth => self.handle_insert_auth(key),
