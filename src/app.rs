@@ -1,16 +1,26 @@
 use std::time::Duration;
 
 use crate::{
-    config::Config, event::AppEvent, http::send, input::TextInput, notifier::{Notifier, NotifyType}, request::{AuthDraft, AuthKind}, ui::UiDimensions
+    config::Config,
+    event::AppEvent,
+    http::send,
+    input::TextInput,
+    notifier::{Notifier, NotifyType},
+    request::{AuthDraft, AuthKind},
+    ui::UiDimensions,
 };
 use crate::{
     local_store::{LocalStore, StoreKey},
     request::{Request, Response},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::widgets::{ListState, ScrollbarState, TableState};
+use ratatui::{
+    text::{Line, Span},
+    widgets::{ListState, ScrollbarState, TableState},
+};
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
+use tui_syntax::{Highlighter, json, themes};
 use tui_textarea::TextArea;
 
 // static SPINNER_FRAMES: &[&char] = &['⠋', '⠙', "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -150,7 +160,9 @@ pub struct App {
     pub dirty: bool,
     pub last_edit: Instant,
     pub spinner_index: usize,
-    pub config: Config
+    pub config: Config,
+    pub highlighter: Highlighter,
+    pub response_lines: Vec<Line<'static>>,
 }
 
 impl App {
@@ -203,6 +215,16 @@ impl App {
         } else {
             collection_list_state.select(Some(0));
         }
+        let mut highlighter = Highlighter::new(themes::one_dark());
+        highlighter.register_language(json()).unwrap_or_else(|e| {
+            notifier.notify(
+                NotifyType::Error,
+                format!(
+                    "Failed to register JSON language for syntax highlighting: {}",
+                    e
+                ),
+            );
+        });
         Self {
             local_store: local_store.clone(),
             sender,
@@ -213,6 +235,7 @@ impl App {
             clipboard,
             notifier,
             config,
+            highlighter,
             debug: config.debug,
             should_quit: false,
             is_loading: false,
@@ -221,6 +244,7 @@ impl App {
             response_scroll: 0,
             selected_request: None,
             response: None,
+            response_lines: Vec::new(),
             error_message: None,
             editing_header_field: None,
             active_collection: None,
@@ -277,6 +301,62 @@ impl App {
         });
     }
 
+    fn set_response(&mut self, response: Response) {
+        // self.response_lines = self.render_response_lines(&response);
+        // self.resonse_lines = self.build_highlighted_body(&response.body);
+        let lines = self.build_response_lines(&response);
+        self.response_lines = lines;
+        // self.response_lines = self.render_response_lines(&response);
+        self.response = Some(response);
+        self.response_scroll = 0;
+    }
+
+    fn build_response_lines(&mut self, response: &Response) -> Vec<Line<'static>> {
+        let body = if let Ok(valid_json) = serde_json::from_str::<serde_json::Value>(&response.body)
+        {
+            serde_json::to_string_pretty(&valid_json).unwrap_or_else(|_| {
+                self.notifier.notify(
+                    NotifyType::Warning,
+                    "Failed to pretty-print JSON. Displaying raw body.".to_string(),
+                );
+                response.body.clone()
+            })
+        } else {
+            self.notifier.notify(
+                NotifyType::Warning,
+                "Response body is not valid JSON. Displaying raw body.".to_string(),
+            );
+            response.body.clone()
+        };
+        // let mut lines = Vec::new();
+        // lines.push(Line::from(format!(
+        //     "HTTP/1.1 {} {}",
+        //     response.status, response.status_text
+        // )));
+        // for (key, value) in &response.headers {
+        //     lines.push(Line::from(format!("{}: {}", key, value)));
+        // }
+        // lines.push(Line::from("")); // Empty line between headers and body
+        let highlighted_body = self.build_highlighted_body(&body.to_string());
+        // let mut lines = Vec::new();
+        // lines.extend(highlighted_body.into_iter().map(|line| Self::into_owned(line)));
+        // lines
+        Vec::from_iter(
+            highlighted_body
+                .into_iter()
+                .map(|line| Self::into_owned(line)),
+        )
+    }
+
+    fn into_owned(line: Line<'_>) -> Line<'static> {
+        Line::from(
+            line.spans
+                .into_iter()
+                .map(|s| Span::styled(s.content.into_owned(), s.style))
+                .collect::<Vec<_>>(),
+        )
+    }
+
     pub fn update(&mut self, event: AppEvent) {
         match event {
             AppEvent::Tick => {
@@ -314,6 +394,7 @@ impl App {
                 self.is_loading = false;
 
                 let response = self.response.clone().unwrap();
+                self.set_response(response.clone());
 
                 // maybe consider making key private again and letting local state handle conversion
                 let key = StoreKey::from(&collection, &self.active_request);
@@ -422,9 +503,24 @@ impl App {
         // }
     }
 
-    pub fn set_dirty_status(&mut self){
+    pub fn set_dirty_status(&mut self) {
         self.dirty = true;
         self.last_edit = Instant::now();
+    }
+
+    pub fn build_highlighted_body(&mut self, body: &String) -> Vec<Line> {
+        self.highlighter
+            .highlight("json", body)
+            .unwrap_or_else(|_| vec![Line::from(body.clone())])
+
+        // for line in body.lines() {
+        //     let highlighted_line = self
+        //         .highlighter
+        //         .highlight("json", line)
+        //         .unwrap_or_else(|_| line);
+        //     highlighted_lines.push(Line::from(highlighted_line));
+        // }
+        // highlighted_lines
     }
 
     fn tab_changed_callback(&mut self) {

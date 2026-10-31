@@ -666,15 +666,92 @@ fn render_response(frame: &mut Frame, app: &App, area: Rect) {
         _ => Color::Red,
     };
 
-    let text = build_response_text(app, resp);
+    let is_json = resp
+        .headers
+        .get("content-type")
+        .is_some_and(|v| v.contains("application/json"));
+
+    // A paragraph-level fg would bleed into highlighted spans that have no fg of their own.
+    let paragraph = if is_json {
+        let status_line = Line::styled(
+            format!(
+                "{} {}   {}ms",
+                resp.status, resp.status_text, resp.duration_ms
+            ),
+            Style::default().fg(status_color),
+        );
+        let lines: Vec<Line> = [status_line, Line::default()]
+            .into_iter()
+            .chain(app.response_lines.iter().cloned())
+            .collect();
+        Paragraph::new(lines)
+    } else {
+        Paragraph::new(build_response_lines(app, resp)).style(Style::default().fg(status_color))
+    };
 
     frame.render_widget(
-        Paragraph::new(text)
-            .style(Style::default().fg(status_color))
-            .scroll((app.response_scroll, 0))
-            .block(block),
+        paragraph.scroll((app.response_scroll, 0)).block(block),
         area,
     );
+}
+
+fn build_response_lines<'a>(app: &'a App, resp: &'a crate::request::Response) -> Vec<Line<'a>> {
+    // fn build_response_lines(app: &mut App, resp: & crate::request::Response) -> Vec<Line> {
+    let body = if resp.body.is_empty() {
+        "(empty)".to_string()
+    } else {
+        resp.body.clone()
+    };
+    if resp
+        .headers
+        .get("content-type")
+        .map(|v| v.contains("application/json"))
+        == Some(true)
+    {
+        return app.response_lines.clone();
+        // Pretty-print JSON if possible.
+        // if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&body) {
+
+            // let json_value =
+            //     serde_json::to_string_pretty(&json_value).unwrap_or_else(|_| body.clone());
+            // let json_value = app.build_highlighted_body(&json_value);
+            // return json_value;
+            // return app.response_lines.clone();
+
+            //
+            //
+            // let json_lines = highlighter
+            //     .highlight("json", &json_value)
+            //     .unwrap_or_else(|_| vec![Line::from(json_value.clone())]);
+            // let body = app.highlighter.highlight(&serde_json::to_string_pretty(&json_value).unwrap_or_else(|_| body)).unwrap_or_else(|| body);
+
+            // return json_lines;
+            // return vec![Line::from(format!(
+            //     "{} {}   {}ms\n\n{}",
+            //     resp.status,
+            //     resp.status_text,
+            //     resp.duration_ms,
+            //     body
+            // ))];
+        // }
+    }
+
+    if app.debug {
+        let headers_text = resp
+            .headers
+            .iter()
+            .map(|(k, v)| format!("{}: {}", k, v))
+            .collect::<Vec<_>>()
+            .join("\n");
+        return vec![Line::from(format!(
+            "{} {}   {}ms\n\n{}\n\nHeaders:\n{}",
+            resp.status, resp.status_text, resp.duration_ms, body, headers_text
+        ))];
+    }
+    vec![Line::from(format!(
+        "{} {}   {}ms\n\n{}",
+        resp.status, resp.status_text, resp.duration_ms, body
+    ))]
 }
 
 fn build_response_text(app: &App, resp: &crate::request::Response) -> String {
@@ -721,6 +798,24 @@ fn build_response_text(app: &App, resp: &crate::request::Response) -> String {
     )
 }
 
+fn build_active_input_span_list(app: &App) -> Vec<Span> {
+    app.active_input
+        .value
+        .chars()
+        .enumerate()
+        .map(|(i, c)| {
+            if i == app.active_input.cursor {
+                Span::styled(
+                    c.to_string(),
+                    Style::default().bg(Color::Yellow).fg(Color::Black),
+                )
+            } else {
+                Span::raw(c.to_string())
+            }
+        })
+        .collect::<Vec<_>>()
+}
+
 fn render_variables(frame: &mut Frame, app: &App, area: Rect) {
     let focused = app.focus == Focus::Variables;
     let block = focused_block("Variables", focused);
@@ -753,87 +848,179 @@ fn render_variables(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    let editing_field = |edit_context: EditContext, row: usize| -> bool {
-        app.edit_context == edit_context && app.variables_table_state.selected() == Some(row)
-    };
+    active_collection
+        .unwrap()
+        .variables
+        .iter()
+        .enumerate()
+        .for_each(|(i, (key, value))| match app.edit_context {
+            EditContext::VariableKey if app.variables_table_state.selected() == Some(i) => {
+                let key_line = Line::from(build_active_input_span_list(app));
+                let value_line = Line::from(value.as_str());
+                let row =
+                    ratatui::widgets::Row::new(vec![key_line.to_string(), value_line.to_string()]);
+                frame.render_stateful_widget(
+                    ratatui::widgets::Table::new(vec![row], widths)
+                        .header(ratatui::widgets::Row::new(vec![
+                            Span::styled("Key", Style::default().bold()),
+                            Span::styled("Value", Style::default().bold()),
+                        ]))
+                        .block(block.clone())
+                        .widths(&[Constraint::Length(20), Constraint::Min(0)])
+                        .row_highlight_style(Style::new().on_black().bold())
+                        .column_highlight_style(Color::Gray)
+                        .cell_highlight_style(Style::new().reversed().yellow())
+                        .highlight_symbol("> "),
+                    variables_area,
+                    &mut app.variables_table_state.clone(),
+                );
+            }
+            EditContext::VariableValue if app.variables_table_state.selected() == Some(i) => {
+                let key_line = Line::from(key.as_str());
+                // let value_line: Vec<Span> = build_active_input_span_list(app);
+                // let value_line = Line::from(value_line);
+                let value_line = Line::from(build_active_input_span_list(app));
+                let row =
+                    ratatui::widgets::Row::new(vec![key_line.to_string(), value_line.to_string()]);
+                frame.render_stateful_widget(
+                    ratatui::widgets::Table::new(vec![row], widths)
+                        .header(ratatui::widgets::Row::new(vec![
+                            Span::styled("Key", Style::default().bold()),
+                            Span::styled("Value", Style::default().bold()),
+                        ]))
+                        .block(block.clone())
+                        .widths(&[Constraint::Length(20), Constraint::Min(0)])
+                        .row_highlight_style(Style::new().on_black().bold())
+                        .column_highlight_style(Color::Gray)
+                        .cell_highlight_style(Style::new().reversed().yellow())
+                        .highlight_symbol("> "),
+                    variables_area,
+                    &mut app.variables_table_state.clone(),
+                );
+            }
+            _ => {}
+        });
+    // let row_variables = active_collection
+    //     .unwrap()
+    //     .variables
+    //     .iter()
+    //     .enumerate()
+    //     .map(|(i, (key, value))| {
+    //         build_variable_row(app, i)
+    //     })
+    //     .collect::<Vec<_>>();
+    // let editing_field = |edit_context: EditContext, row: usize| -> bool {
+    //     app.edit_context == edit_context && app.variables_table_state.selected() == Some(row)
+    // };
 
-    let mut row_variables = Vec::new();
-    for (i, v) in active_collection.unwrap().variables.iter().enumerate() {
-        let v = v.clone();
-        let key_style = editing_field(EditContext::VariableKey, i)
-            .then(|| Style::default().fg(Color::Yellow))
-            .unwrap_or_else(|| Style::default().fg(Color::Cyan));
-        let value_style = editing_field(EditContext::VariableValue, i)
-            .then(|| Style::default().fg(Color::Yellow))
-            .unwrap_or_else(|| Style::default().fg(Color::White));
-        let row = [
-            Span::styled(v.0, key_style),
-            Span::styled(v.1, value_style)
-        ];
-        // let key: Line = if is_editing_variable_field(&app, EditContext::VariableKey, i) {
-        //     // Span::styled(&app.active_input.value, Style::default().fg(Color::Yellow))
-        //     highlighted_variable_field(app.active_input.cursor, &app.active_input.value)
-        // } else {
-        //     // Span::styled(v.0, Style::default().fg(Color::Cyan))
-        //     Line::from(Span::styled(v.0, Style::default().fg(Color::Cyan)))
-        // };
-        //
-        // let value = if is_editing_variable_field(&app, EditContext::VariableValue, i) {
-        //     // Span::styled(&app.active_input.value, Style::default().fg(Color::Yellow))
-        //     highlighted_variable_field(app.active_input.cursor, &app.active_input.value)
-        // } else {
-        //     // Span::styled(v.1, Style::default().fg(Color::White))
-        //     Line::from(Span::styled(v.1, Style::default().fg(Color::White)))
-        // };
-
-        // let row = ratatui::widgets::Row::new(vec![key, value]);
-        let row = ratatui::widgets::Row::new(row);
-        row_variables.push(row);
-    }
-    // let variables = active_collection.unwrap().variables.iter().map(|(k, v)| {
-    //     let key = Span::styled(k, Style::default().fg(Color::Cyan));
-    //     let value = Span::styled(v, Style::default().fg(Color::White));
-    //     ratatui::widgets::Row::new(vec![key, value])
+    // for (i, v) in active_collection.unwrap().variables.iter().enumerate() {
+    // let v = v.clone();
+    // let key = v.0.chars().enumerate().map(|(j, c)| {
+    //     if editing_field(EditContext::VariableKey, i) && app.active_input.cursor == j {
+    //         Span::styled(
+    //             c.to_string(),
+    //             Style::default().bg(Color::Yellow).fg(Color::Black),
+    //         )
+    //     } else {
+    //         Span::raw(c.to_string())
+    //     }
     // });
+    // let key = Line::from(key.collect::<Vec<_>>());
+    //
+    // let value = v.1.chars().enumerate().map(|(j, c)| {
+    //     if editing_field(EditContext::VariableValue, i) && app.active_input.cursor == j {
+    //         Span::styled(
+    //             c.to_string(),
+    //             Style::default().bg(Color::Yellow).fg(Color::Black),
+    //         )
+    //     } else {
+    //         Span::raw(c.to_string())
+    //     }
+    // });
+    // let value = Line::from(value.collect::<Vec<_>>());
+    // let key_style = editing_field(EditContext::VariableKey, i)
+    //     .then(|| Style::default().fg(Color::Yellow))
+    //     .unwrap_or_else(|| Style::default().fg(Color::Cyan));
+    // let key_style = if editing_field(EditContext::VariableKey, i) {
+    //     Style::default().fg(Color::Yellow)
+    // } else {
+    //     Style::default().fg(Color::Cyan)
+    // };
+    // let value_style = editing_field(EditContext::VariableValue, i)
+    //     .then(|| Style::default().fg(Color::Yellow))
+    //     .unwrap_or_else(|| Style::default().fg(Color::White));
+    //
+    // row_variables.push(ratatui::widgets::Row::new(vec![
+    //     Span::styled(key.to_string(), key_style),
+    //     Span::styled(value.to_string(), value_style),
+    // ]));
+    // }
 
-    frame.render_stateful_widget(
-        ratatui::widgets::Table::new(row_variables, widths)
-            .header(ratatui::widgets::Row::new(vec![
-                Span::styled("Key", Style::default().bold()),
-                Span::styled("Value", Style::default().bold()),
-            ]))
-            .block(block)
-            .widths(&[Constraint::Length(20), Constraint::Min(0)])
-            .row_highlight_style(Style::new().on_black().bold())
-            .column_highlight_style(Color::Gray)
-            .cell_highlight_style(Style::new().reversed().yellow())
-            .highlight_symbol("> "),
-        variables_area,
-        &mut app.variables_table_state.clone(),
-    );
+    // frame.render_stateful_widget(
+    //     ratatui::widgets::Table::new(row_variables, widths)
+    //         .header(ratatui::widgets::Row::new(vec![
+    //             Span::styled("Key", Style::default().bold()),
+    //             Span::styled("Value", Style::default().bold()),
+    //         ]))
+    //         .block(block)
+    //         .widths(&[Constraint::Length(20), Constraint::Min(0)])
+    //         .row_highlight_style(Style::new().on_black().bold())
+    //         .column_highlight_style(Color::Gray)
+    //         .cell_highlight_style(Style::new().reversed().yellow())
+    //         .highlight_symbol("> "),
+    //     variables_area,
+    //     &mut app.variables_table_state.clone(),
+    // );
 }
 
-fn is_editing_variable_field(app: &App, edit_context: EditContext, row: usize) -> bool {
-    if app.input_mode == InputMode::Normal || app.focus != Focus::Variables {
-        return false;
-    }
+// fn build_variable_span(app: &App, row: usize, col: usize) -> Span {
+//     let active_collection = app.get_active_collection();
+//     if let Some(col) = active_collection {
+//         if let Some((key, value)) = col.variables.get(row) {
+//             let value_str = if col == 0 { key } else { value };
+//             let is_editing = match (col, app.edit_context) {
+//                 (0, EditContext::VariableKey) => true,
+//                 (1, EditContext::VariableValue) => true,
+//                 _ => false,
+//             };
+//             if is_editing && app.variables_table_state.selected() == Some(row) {
+//                 return Span::styled(
+//                     value_str.to_string(),
+//                     Style::default().bg(Color::Yellow).fg(Color::Black),
+//                 );
+//             } else {
+//                 return Span::raw(value_str.to_string());
+//             }
+//         }
+//     }
+//     Span::raw("")
+// }
 
-    app.variables_table_state.selected() == Some(row) && app.edit_context == edit_context
-}
+// fn build_variable_row(app: &App, row: usize) -> ratatui::widgets::Row {
+//     let active_collection = app.get_active_collection();
+//     if let Some(col) = active_collection {
+//         if let Some((key, value)) = col.variables.get(row) {
+//             let key_line = highlighted_variable_field(app.active_input.cursor, key);
+//             let value_line = highlighted_variable_field(app.active_input.cursor, value);
+//             return ratatui::widgets::Row::new(vec![key_line.to_string(), value_line.to_string()]);
+//         }
+//     }
+//     ratatui::widgets::Row::new(vec!["", ""])
+// }
 
-fn highlighted_variable_field(current_index: usize, value: &String) -> Line {
-    let text = value.chars().enumerate().map(|(i, c)| {
-        if i == current_index {
-            Span::styled(
-                c.to_string(),
-                Style::default().bg(Color::Yellow).fg(Color::Black),
-            )
-        } else {
-            Span::raw(c.to_string())
-        }
-    });
-    Line::from(text.collect::<Vec<_>>()).clone()
-}
+// fn highlighted_variable_field(current_index: usize, value: &String) -> Line {
+// let text = value.chars().enumerate().map(|(i, c)| {
+//     if i == current_index {
+//         Span::styled(
+//             c.to_string(),
+//             Style::default().bg(Color::Yellow).fg(Color::Black),
+//         )
+//     } else {
+//         Span::raw(c.to_string())
+//     }
+// });
+// Line::from(text.collect::<Vec<_>>()).clone()
+// }
 
 // ---------------------------------------------------------------------------
 // Notifier
@@ -916,7 +1103,7 @@ fn render_debug_info(frame: &mut Frame, app: &App, area: Rect) {
         //  response: {:?}\n
         //  selected_header_row: {:?}\tediting_header_field: {:?}\theaders_table_selected: {:?}\n
         //  collection_ui_state: {:?}",
-        "focus: {:?} | tab: {:?} | mode: {:?}\nresponse: {:?}\nselected_header_row: {:?} | editing_header_field: {:?} | headers_table_selected: {:?}\ncollection_ui_state: {:?} | selected_collection: {:?}\nauth_kind: {:?}\nauth_draft: {:?}\nediting_auth_field: {:?}\nactive_input.value: {:?}\nactive_input.cursor: {:?}\nvariables_table_selected: {:?}\nedit_context: {:?} | busy: {:?} | dirty: {:?} | last_edit: {:?}\nspinner: {:?}",
+        "focus: {:?} | tab: {:?} | mode: {:?}\nresponse: {:?}\nselected_header_row: {:?} | editing_header_field: {:?} | headers_table_selected: {:?}\ncollection_ui_state: {:?} | selected_collection: {:?}\nauth_kind: {:?}\nauth_draft: {:?}\nediting_auth_field: {:?}\nactive_input.value: {:?}\nactive_input.cursor: {:?}\nvariables_table_selected: {:?}\nedit_context: {:?} | busy: {:?} | dirty: {:?} | last_edit: {:?}\nspinner: {:?} | response_scroll: {:?} | response_lines.len: {:?}",
         app.focus,
         app.active_tab,
         app.input_mode,
@@ -936,7 +1123,9 @@ fn render_debug_info(frame: &mut Frame, app: &App, area: Rect) {
         app.busy,
         app.dirty,
         app.last_edit,
-        app.get_spinner()
+        app.get_spinner(),
+        app.response_scroll,
+        app.response_lines.len()
     );
 
     let debug_area = Rect {
