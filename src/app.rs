@@ -523,6 +523,16 @@ impl App {
         // highlighted_lines
     }
 
+    pub fn active_edit_context(
+        &self,
+        edit_context: EditContext,
+        focus: Focus,
+        input_mode: InputMode,
+        index: Option<usize>,
+    ) -> bool {
+        self.edit_context == edit_context && self.focus == focus && self.input_mode == input_mode && self.selected_header_row == index.unwrap_or(0)
+    }
+
     fn tab_changed_callback(&mut self) {
         match self.focus {
             Focus::Variables => {
